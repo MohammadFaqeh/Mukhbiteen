@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { -webkit-tap-highlight-color: transparent; }
+  body {
+    @apply bg-paper font-sans text-ink antialiased;
+    font-feature-settings: 'kern';
+  }
+  ::selection { background: #E6D8C3; color: #1E2B45; }
+  :focus-visible { outline: 2px solid #7A2336; outline-offset: 2px; border-radius: 6px; }
+  input, select, textarea { font: inherit; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+  }
+}
+
+@layer components {
+  /* ---------- البطاقات ---------- */
+  .card {
+    @apply rounded-2xl border border-navy-100/70 bg-white/85 shadow-soft backdrop-blur-[2px];
+  }
+  .card-quiet {
+    @apply rounded-2xl border border-navy-100/60 bg-white/60;
+  }
+  .section-title {
+    @apply text-[15px] font-bold text-navy-800;
+  }
+  .muted { @apply text-navy-400; }
+
+  /* ---------- الحقول ---------- */
+  .field-label { @apply mb-1.5 block text-[13px] font-medium text-navy-600; }
+  .input {
+    @apply w-full rounded-xl border border-navy-100 bg-white px-3.5 py-2.5 text-[14px] text-ink placeholder:text-navy-300
+           transition focus:border-burgundy-300 focus:outline-none focus:ring-4 focus:ring-burgundy-100/70;
+  }
+  .input-sm { @apply rounded-lg px-2.5 py-1.5 text-[13px]; }
+
+  /* ---------- الأزرار ---------- */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-[14px] font-bold transition
+           disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary { @apply btn bg-navy-800 text-white hover:bg-navy-900; }
+  .btn-accent { @apply btn bg-burgundy-600 text-white hover:bg-burgundy-700; }
+  .btn-ghost { @apply btn border border-navy-100 bg-white text-navy-700 hover:border-navy-200 hover:bg-navy-50; }
+  .btn-soft { @apply btn bg-navy-50 text-navy-700 hover:bg-navy-100; }
+
+  /* ---------- التذكرة (مستوحاة من شعار المشروع) ---------- */
+  .ticket-edge {
+    --r: 7px;
+    -webkit-mask: radial-gradient(var(--r) at 50% 100%, #0000 97%, #000) 50% / calc(var(--r) * 3.2) 100% repeat-x;
+    mask: radial-gradient(var(--r) at 50% 100%, #0000 97%, #000) 50% / calc(var(--r) * 3.2) 100% repeat-x;
+  }
+  .paper-grain {
+    background-image:
+      radial-gradient(rgba(122, 35, 54, .05) 1px, transparent 1px),
+      radial-gradient(rgba(30, 43, 69, .04) 1px, transparent 1px);
+    background-size: 14px 14px, 22px 22px;
+    background-position: 0 0, 7px 11px;
+  }
+
+  .scrollbar-thin { scrollbar-width: thin; scrollbar-color: #B3BFD4 transparent; }
+  .no-scrollbar { scrollbar-width: none; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+}
