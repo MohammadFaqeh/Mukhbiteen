@@ -1,5 +1,5 @@
 import { useState, type ChangeEvent } from 'react';
-import { CalendarDays, Clock, ImagePlus, PencilLine, Plus, Trash2 } from 'lucide-react';
+import { CalendarDays, Clock, ImagePlus, Loader2, PencilLine, Plus, Trash2 } from 'lucide-react';
 import { useData } from '@/context/DataContext';
 import { useToast } from '@/context/ToastContext';
 import PageHeader from '@/components/shared/PageHeader';
@@ -8,7 +8,8 @@ import Badge from '@/components/ui/Badge';
 import Slideshow from '@/components/parent/Slideshow';
 import { Field } from '@/components/admin/fields';
 import type { Activity } from '@/types';
-import { TODAY } from '@/data/mockData';
+import { supabase } from '@/lib/supabase';
+import { TODAY } from '@/utils/today';
 import { isActivityLive } from '@/utils/stats';
 import { daysBetween, formatDate } from '@/utils/format';
 
@@ -20,6 +21,8 @@ export default function AdminActivities() {
   const [modal, setModal] = useState<{ open: boolean; id?: string }>({ open: false });
   const [d, setD] = useState<Omit<Activity, 'id'>>(blank);
   const [err, setErr] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const live = activities.filter((a) => isActivityLive(a, TODAY));
 
   const openNew = () => {
@@ -32,17 +35,32 @@ export default function AdminActivities() {
     setErr('');
     setModal({ open: true, id: a.id });
   };
-  const onFile = (e: ChangeEvent<HTMLInputElement>) => {
+  const onFile = async (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
-    if (f) setD((x) => ({ ...x, image: URL.createObjectURL(f) })); // لاحقًا: Supabase Storage
+    if (!f) return;
+    setUploading(true);
+    const path = `${Date.now()}-${f.name}`;
+    const { data, error } = await supabase.storage.from('activity-images').upload(path, f, { upsert: true });
+    setUploading(false);
+    if (error) return setErr(`تعذّر رفع الصورة: ${error.message}`);
+    const { data: pub } = supabase.storage.from('activity-images').getPublicUrl(data.path);
+    setD((x) => ({ ...x, image: pub.publicUrl }));
   };
-  const save = () => {
+  const save = async () => {
     if (!d.image) return setErr('اختر صورة أولًا.');
     if (!d.title.trim()) return setErr('اكتب عنوانًا للصورة.');
-    if (modal.id) updateActivity(modal.id, d);
-    else addActivity(d);
-    toast(modal.id ? 'تم حفظ التعديلات' : 'تمت إضافة الصورة');
-    setModal({ open: false });
+    setSaving(true);
+    setErr('');
+    try {
+      if (modal.id) await updateActivity(modal.id, d);
+      else await addActivity(d);
+      toast(modal.id ? 'تم حفظ التعديلات' : 'تمت إضافة الصورة');
+      setModal({ open: false });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'حدث خطأ غير متوقع.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -90,10 +108,13 @@ export default function AdminActivities() {
                     </button>
                     <button
                       className="btn py-1.5 text-[12px] text-burgundy-600 hover:bg-burgundy-50"
-                      onClick={() => {
-                        if (confirm('حذف هذه الصورة؟')) {
-                          deleteActivity(a.id);
+                      onClick={async () => {
+                        if (!confirm('حذف هذه الصورة؟')) return;
+                        try {
+                          await deleteActivity(a.id);
                           toast('تم حذف الصورة');
+                        } catch (e) {
+                          toast(e instanceof Error ? e.message : 'حدث خطأ أثناء الحذف.');
                         }
                       }}
                     >
@@ -117,7 +138,8 @@ export default function AdminActivities() {
             <button className="btn-ghost" onClick={() => setModal({ open: false })}>
               إلغاء
             </button>
-            <button className="btn-primary" onClick={save}>
+            <button className="btn-primary" onClick={save} disabled={saving || uploading}>
+              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
               {modal.id ? 'حفظ التعديلات' : 'إضافة الصورة'}
             </button>
           </>
@@ -125,9 +147,9 @@ export default function AdminActivities() {
       >
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="relative flex aspect-[16/10] cursor-pointer flex-col items-center justify-center gap-2 overflow-hidden rounded-2xl border border-dashed border-navy-200 bg-navy-50/40 text-[13px] text-navy-500 hover:bg-navy-50 sm:col-span-2">
-            {d.image ? <img src={d.image} alt="" className="absolute inset-0 h-full w-full object-cover" /> : <ImagePlus className="h-9 w-9 text-navy-300" />}
-            {!d.image && 'اختر صورة من جهازك'}
-            <input type="file" accept="image/*" className="sr-only" onChange={onFile} />
+            {uploading ? <Loader2 className="h-9 w-9 animate-spin text-navy-300" /> : d.image ? <img src={d.image} alt="" className="absolute inset-0 h-full w-full object-cover" /> : <ImagePlus className="h-9 w-9 text-navy-300" />}
+            {uploading ? 'جارٍ الرفع...' : !d.image && 'اختر صورة من جهازك'}
+            <input type="file" accept="image/*" className="sr-only" onChange={onFile} disabled={uploading} />
           </label>
           <Field label="العنوان" className="sm:col-span-2">
             <input className="input" value={d.title} onChange={(e) => setD({ ...d, title: e.target.value })} placeholder="جانب من لقاء اليوم" />

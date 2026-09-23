@@ -5,14 +5,14 @@ import NextSessionTicket from '@/components/parent/NextSessionTicket';
 import { Field } from './fields';
 import { useData } from '@/context/DataContext';
 import { useToast } from '@/context/ToastContext';
-import { TODAY } from '@/data/mockData';
+import { TODAY } from '@/utils/today';
 
 /** تحديد المطلوب للدوام القادم مع معاينة مباشرة لما سيراه ولي الأمر */
 export default function NextRequirementForm({ studentId }: { studentId: string }) {
   const { getRequirement, saveRequirement } = useData();
   const toast = useToast();
   const current = getRequirement(studentId);
-  const [r, setR] = useState<NextRequirement>(current ?? { studentId, date: '2026-09-24', memorization: '', revision: '', extraTask: '', notes: '', updatedAt: TODAY });
+  const [r, setR] = useState<NextRequirement>(current ?? { studentId, date: '', memorization: '', revision: '', extraTask: '', notes: '', updatedAt: TODAY });
   useEffect(() => {
     if (current) setR(current);
   }, [current]);
@@ -39,9 +39,13 @@ export default function NextRequirementForm({ studentId }: { studentId: string }
         </Field>
         <button
           className="btn-accent w-full"
-          onClick={() => {
-            saveRequirement({ ...r, updatedAt: TODAY });
-            toast('تم حفظ المطلوب للدوام القادم');
+          onClick={async () => {
+            try {
+              await saveRequirement({ ...r, updatedAt: TODAY });
+              toast('تم حفظ المطلوب للدوام القادم');
+            } catch (e) {
+              toast(e instanceof Error ? e.message : 'حدث خطأ أثناء الحفظ.');
+            }
           }}
         >
           <Save className="h-4 w-4" />

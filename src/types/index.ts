@@ -1,7 +1,5 @@
 /**
- * أنواع البيانات الأساسية للمشروع.
- * صُممت لتطابق جداول Supabase المستقبلية (students, sessions, next_requirements, activities, guardians)
- * بحيث يتم الربط لاحقًا دون تغيير واجهات المكونات.
+ * أنواع البيانات الأساسية للمشروع، مطابقة لجداول Supabase (انظر supabase/schema.sql).
  */
 
 export type Role = 'admin' | 'parent';
@@ -10,27 +8,41 @@ export type AttendanceStatus = 'present' | 'absent' | 'excused' | 'late';
 
 export type CommitmentLevel = 'excellent' | 'very_good' | 'good' | 'needs_work';
 
-export type WorshipKey =
-  | 'fajr'
-  | 'dhuhr'
-  | 'asr'
-  | 'maghrib'
-  | 'isha'
-  | 'morningAdhkar'
-  | 'eveningAdhkar'
-  | 'quranWird';
+export type PrayerKey = 'fajr' | 'dhuhr' | 'asr' | 'maghrib' | 'isha';
+export type PrayerLocation = 'mosque' | 'home' | 'missed';
 
-export type WorshipRecord = Record<WorshipKey, boolean>;
+/**
+ * جدول العبادات اليومي (من السبت إلى الخميس – يوم الجمعة هو يوم الدوام بالمركز ويُقيَّم مباشرة).
+ * يُعبّئ أسبوعيًا من ورقة ولي الأمر، ومستقل تمامًا عن أيام حضور المركز (SessionRecord).
+ */
+export interface DailyWorship {
+  id: string; // `${studentId}-${date}`
+  studentId: string;
+  date: string; // YYYY-MM-DD
+  prayers: Record<PrayerKey, PrayerLocation>;
+  morningAdhkar: boolean;
+  eveningAdhkar: boolean;
+  sleepAdhkar: boolean;
+  duhaRakahs: number; // صلاة الضحى
+  qiyam: boolean; // قيام الليل
+  witrRakahs: number;
+  rawatibRakahs: number; // السنن الرواتب، من أصل 12
+  parentsSatisfaction: number; // نسبة رضا الوالدين 0-100
+  wirdFromPage?: number; // ورد القراءة نظرًا عن المصحف
+  wirdToPage?: number;
+  charity: boolean; // الصدقة (مرة على الأقل بالأسبوع) – نفس القيمة تتكرر على كل أيام أسبوعها
+  notes?: string;
+}
 
 export interface Student {
   id: string;
   name: string; // الاسم الكامل
   shortName: string; // الاسم المختصر (يظهر في البطاقات)
-  photo?: string; // مسار الصورة داخل public/
+  photo?: string; // رابط الصورة في Supabase Storage
   birthDate: string; // YYYY-MM-DD
   group: string;
   guardianName: string;
-  username: string; // اسم مستخدم ولي الأمر
+  guardianEmail?: string; // بريد ولي الأمر لتسجيل الدخول عبر Supabase Auth
   joinedAt: string;
   notes?: string;
   active: boolean;
@@ -61,7 +73,6 @@ export interface SessionRecord {
   score?: number; // علامة اليوم /100
   memorization?: MemorizationEntry | null;
   revision?: RevisionEntry | null;
-  worship?: WorshipRecord;
   notes?: string;
 }
 
@@ -82,14 +93,6 @@ export interface Activity {
   description: string;
   date: string; // تاريخ النشر
   durationDays: number; // مدة العرض بالأيام
-}
-
-export interface DemoAccount {
-  role: Role;
-  username: string;
-  password: string;
-  displayName: string;
-  studentId?: string; // لحساب ولي الأمر
 }
 
 export interface Supervisor {

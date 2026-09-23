@@ -1,4 +1,4 @@
-import type { AttendanceStatus, CommitmentLevel, WorshipKey } from '@/types';
+import type { AttendanceStatus, CommitmentLevel } from '@/types';
 
 export const MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
 export const WEEKDAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
@@ -62,17 +62,6 @@ export const commitmentLabels: Record<CommitmentLevel, string> = {
   good: 'جيد',
   needs_work: 'يحتاج متابعة',
 };
-
-export const worshipItems: { key: WorshipKey; label: string; group: 'prayer' | 'dhikr' }[] = [
-  { key: 'fajr', label: 'الفجر', group: 'prayer' },
-  { key: 'dhuhr', label: 'الظهر', group: 'prayer' },
-  { key: 'asr', label: 'العصر', group: 'prayer' },
-  { key: 'maghrib', label: 'المغرب', group: 'prayer' },
-  { key: 'isha', label: 'العشاء', group: 'prayer' },
-  { key: 'morningAdhkar', label: 'أذكار الصباح', group: 'dhikr' },
-  { key: 'eveningAdhkar', label: 'أذكار المساء', group: 'dhikr' },
-  { key: 'quranWird', label: 'ورد القرآن', group: 'dhikr' },
-];
 
 export function initials(name: string) {
   const parts = name.trim().split(/\s+/);

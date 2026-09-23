@@ -1,18 +1,8 @@
-import type { CommitmentLevel, SessionRecord, WorshipRecord } from '@/types';
+import type { CommitmentLevel, DailyWorship, SessionRecord } from '@/types';
 import { round1 } from './format';
+import { dailyWorshipScore } from './worship';
 
 const attended = (s: SessionRecord) => s.attendance === 'present' || s.attendance === 'late';
-
-export function worshipPercent(w?: WorshipRecord) {
-  if (!w) return 0;
-  const v = Object.values(w);
-  return round1((v.filter(Boolean).length / v.length) * 100);
-}
-export function worshipCount(w?: WorshipRecord) {
-  if (!w) return { done: 0, total: 8 };
-  const v = Object.values(w);
-  return { done: v.filter(Boolean).length, total: v.length };
-}
 
 const avg = (nums: number[]) => (nums.length ? round1(nums.reduce((a, b) => a + b, 0) / nums.length) : 0);
 
@@ -55,16 +45,17 @@ export interface StudentStats {
 }
 
 /** الإحصائيات الكاملة لطالب (السجلات مرتبة من الأحدث للأقدم) */
-export function studentStats(all: SessionRecord[], studentId: string, month?: string): StudentStats {
+export function studentStats(all: SessionRecord[], dailyWorship: DailyWorship[], studentId: string, month?: string): StudentStats {
   const list = all.filter((s) => s.studentId === studentId).sort((a, b) => b.date.localeCompare(a.date));
   const scored = list.filter((s) => attended(s) && typeof s.score === 'number');
   const m = month ?? (list[0] ? monthKey(list[0].date) : '');
   const inMonth = scored.filter((s) => monthKey(s.date) === m);
+  const worshipDays = dailyWorship.filter((d) => d.studentId === studentId && monthKey(d.date) === m);
   return {
     cumulative: avg(scored.map((s) => s.score!)),
     monthAverage: avg(inMonth.map((s) => s.score!)),
     attendance: attendanceRate(list),
-    worship: avg(scored.filter((s) => monthKey(s.date) === m).map((s) => worshipPercent(s.worship))),
+    worship: avg(worshipDays.map((d) => dailyWorshipScore(d))),
     lastScore: scored[0]?.score,
     lastSession: list[0],
     lastAttended: scored[0],
@@ -85,14 +76,14 @@ export function suggestScore(input: {
   attendance: SessionRecord['attendance'];
   memGrade?: number;
   revGrade?: number;
-  worship?: WorshipRecord;
+  weekWorship?: number; // علامة أسبوع العبادات (سبت-خميس) المرتبط بهذا اليوم، من 100
   evaluation?: number; // 0..100
 }) {
   if (input.attendance === 'absent' || input.attendance === 'excused') return 0;
   const att = input.attendance === 'late' ? 6 : 10;
   const mem = input.memGrade ?? input.revGrade ?? 0;
   const rev = input.revGrade ?? input.memGrade ?? 0;
-  const w = worshipPercent(input.worship);
+  const w = input.weekWorship ?? 0;
   const ev = input.evaluation ?? 90;
   return Math.round(att + mem * 0.3 + rev * 0.3 + w * 0.2 + ev * 0.1);
 }

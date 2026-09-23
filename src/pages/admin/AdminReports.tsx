@@ -11,7 +11,7 @@ import { availableMonths, studentStats } from '@/utils/stats';
 import { formatMonthKey, pct } from '@/utils/format';
 
 export default function AdminReports() {
-  const { students, sessions } = useData();
+  const { students, sessions, dailyWorship } = useData();
   const toast = useToast();
   const months = useMemo(() => availableMonths(sessions), [sessions]);
   const [month, setMonth] = useState(months[0] ?? '');
@@ -20,10 +20,10 @@ export default function AdminReports() {
       students
         .map((s) => {
           const inMonth = sessions.filter((x) => x.studentId === s.id && x.date.startsWith(month));
-          return { s, all: studentStats(sessions, s.id), m: studentStats(inMonth, s.id, month) };
+          return { s, all: studentStats(sessions, dailyWorship, s.id), m: studentStats(inMonth, dailyWorship, s.id, month) };
         })
         .sort((a, b) => b.m.monthAverage - a.m.monthAverage),
-    [students, sessions, month],
+    [students, sessions, dailyWorship, month],
   );
 
   return (

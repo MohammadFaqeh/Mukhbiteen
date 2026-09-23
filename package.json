@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "واجهة مشروع المخبتين القرآني – مركز كفرأبيل القرآني (Frontend تجريبي)",
+  "description": "منصة متابعة طلاب مشروع المخبتين القرآني – مركز كفرأبيل القرآني",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -12,6 +12,7 @@
   "dependencies": {
     "@fontsource/amiri": "^5.1.0",
     "@fontsource/tajawal": "^5.1.0",
+    "@supabase/supabase-js": "^2.117.0",
     "lucide-react": "^0.460.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

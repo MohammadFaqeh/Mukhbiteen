@@ -6,16 +6,17 @@ import { studentSessions, studentStats } from '@/utils/stats';
 /** يعيد الطالب المرتبط بحساب ولي الأمر الحالي مع سجلاته وإحصائياته */
 export function useParentStudent() {
   const { user } = useAuth();
-  const { students, sessions, getRequirement, activities } = useData();
+  const { students, sessions, dailyWorship, getRequirement, activities } = useData();
   const id = user?.studentId ?? students[0]?.id;
   return useMemo(() => {
     const student = students.find((s) => s.id === id);
     return {
       student,
       sessions: id ? studentSessions(sessions, id) : [],
-      stats: id ? studentStats(sessions, id) : undefined,
+      worship: id ? dailyWorship.filter((d) => d.studentId === id).sort((a, b) => b.date.localeCompare(a.date)) : [],
+      stats: id ? studentStats(sessions, dailyWorship, id) : undefined,
       requirement: id ? getRequirement(id) : undefined,
       activities,
     };
-  }, [id, students, sessions, getRequirement, activities]);
+  }, [id, students, sessions, dailyWorship, getRequirement, activities]);
 }

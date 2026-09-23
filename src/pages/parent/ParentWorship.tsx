@@ -1,83 +1,77 @@
 import { useMemo, useState } from 'react';
-import { Check, X } from 'lucide-react';
 import { useParentStudent } from '@/hooks/useParentStudent';
 import PageHeader from '@/components/shared/PageHeader';
 import WorshipCard from '@/components/parent/WorshipCard';
+import WorshipWeekGrid from '@/components/shared/WorshipWeekGrid';
 import Select from '@/components/ui/Select';
-import { availableMonths, monthKey, worshipPercent } from '@/utils/stats';
-import { formatDayMonth, formatMonthKey, pct, worshipItems } from '@/utils/format';
+import { monthKey } from '@/utils/stats';
+import { dailyWorshipScore, weekDates, weekStartOf, weekWorshipScore } from '@/utils/worship';
+import { formatDate, formatMonthKey, pct } from '@/utils/format';
 
 export default function ParentWorship() {
-  const { sessions, stats } = useParentStudent();
-  const months = useMemo(() => availableMonths(sessions), [sessions]);
-  const [month, setMonth] = useState(months[0] ?? '');
-  const days = sessions.filter((s) => s.worship && monthKey(s.date) === month).slice().reverse();
-  const perItem = worshipItems.map((w) => ({ ...w, rate: days.length ? Math.round((days.filter((d) => d.worship![w.key]).length / days.length) * 100) : 0 }));
+  const { worship, stats } = useParentStudent();
+
+  const weeks = useMemo(() => [...new Set(worship.map((d) => weekStartOf(d.date)))].sort().reverse(), [worship]);
+  const [weekStart, setWeekStart] = useState(weeks[0] ?? '');
+  const dates = useMemo(() => weekDates(weekStart || weeks[0] || ''), [weekStart, weeks]);
+  const daysMap = useMemo(() => Object.fromEntries(dates.map((d) => [d, worship.find((w) => w.date === d)])), [dates, worship]);
+  const weekDays = dates.map((d) => daysMap[d]).filter((d): d is NonNullable<typeof d> => !!d);
+  const weekScore = weekWorshipScore(weekDays);
+
+  const months = useMemo(() => [...new Set(worship.map((d) => monthKey(d.date)))].sort().reverse(), [worship]);
+  const monthlyAvg = months.map((m) => {
+    const list = worship.filter((d) => monthKey(d.date) === m);
+    const v = Math.round(list.reduce((a, d) => a + dailyWorshipScore(d), 0) / (list.length || 1));
+    return { m, v };
+  });
+
   if (!stats) return null;
 
   return (
     <div>
       <PageHeader
         title="العبادات"
-        subtitle="متابعة الصلوات والأذكار وورد القرآن"
-        actions={<Select value={month} onChange={setMonth} options={months.map((m) => ({ value: m, label: formatMonthKey(m) }))} className="w-44" ariaLabel="الشهر" />}
+        subtitle="جدول العبادات الأسبوعي (من السبت إلى الخميس) – يوم الجمعة هو يوم الدوام بالمركز"
+        actions={
+          weeks.length > 0 && (
+            <Select value={weekStart || weeks[0]} onChange={setWeekStart} options={weeks.map((w) => ({ value: w, label: `أسبوع ${formatDate(w)}` }))} className="w-52" ariaLabel="اختيار الأسبوع" />
+          )
+        }
       />
       <div className="grid gap-4 lg:grid-cols-12">
-        <div className="lg:col-span-5">
-          <WorshipCard last={stats.lastAttended} monthAverage={stats.worship} />
+        <div className="lg:col-span-4">
+          <WorshipCard weekDays={weekDays} monthAverage={stats.worship} />
         </div>
-        <section className="card p-5 lg:col-span-7">
-          <h3 className="section-title mb-4">نسبة المحافظة في {formatMonthKey(month)}</h3>
-          <div className="space-y-2.5">
-            {perItem.map((w) => (
-              <div key={w.key} className="flex items-center gap-3 text-[13px]">
-                <span className="w-24 shrink-0 text-navy-600">{w.label}</span>
-                <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-navy-50">
-                  <div className="h-full rounded-full bg-gradient-to-l from-navy-700 to-navy-500" style={{ width: `${w.rate}%` }} />
+        <section className="card p-5 lg:col-span-8">
+          <h3 className="section-title mb-4">معدل العبادات الشهري</h3>
+          {monthlyAvg.length ? (
+            <div className="space-y-3">
+              {monthlyAvg.map(({ m, v }) => (
+                <div key={m}>
+                  <div className="mb-1 flex justify-between text-[13px]">
+                    <span className="text-navy-600">{formatMonthKey(m)}</span>
+                    <b className="text-navy-900">{v}%</b>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-navy-50">
+                    <div className="h-full rounded-full bg-gradient-to-l from-emerald-600 to-emerald-400" style={{ width: `${v}%` }} />
+                  </div>
                 </div>
-                <span className="w-10 text-left font-bold text-navy-800">{w.rate}%</span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-navy-400">لا توجد بيانات بعد.</p>
+          )}
         </section>
       </div>
 
       <section className="card mt-4 p-5">
-        <h3 className="section-title mb-4">جدول الشهر</h3>
-        <div className="scrollbar-thin overflow-x-auto">
-          <table className="w-full min-w-[640px] text-[12px]">
-            <thead>
-              <tr>
-                <th className="pb-2 text-right font-medium text-navy-400">العبادة</th>
-                {days.map((d) => (
-                  <th key={d.id} className="pb-2 font-medium text-navy-500">
-                    {formatDayMonth(d.date)}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {worshipItems.map((w) => (
-                <tr key={w.key} className="border-t border-navy-50">
-                  <td className="py-2 text-[13px] text-navy-700">{w.label}</td>
-                  {days.map((d) => (
-                    <td key={d.id} className="py-2 text-center">
-                      {d.worship![w.key] ? <Check className="mx-auto h-4 w-4 text-emerald-600" strokeWidth={2.6} /> : <X className="mx-auto h-4 w-4 text-burgundy-400" strokeWidth={2.6} />}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-              <tr className="border-t border-navy-100">
-                <td className="py-2 text-[13px] font-bold text-navy-800">نسبة اليوم</td>
-                {days.map((d) => (
-                  <td key={d.id} className="py-2 text-center font-bold text-navy-800">
-                    {pct(worshipPercent(d.worship), 0)}
-                  </td>
-                ))}
-              </tr>
-            </tbody>
-          </table>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <h3 className="section-title">جدول الأسبوع</h3>
+          <span className="text-[13px] text-navy-500">
+            علامة الأسبوع: <b className="text-navy-900">{pct(weekScore)}</b>
+          </span>
         </div>
+        {dates.length ? <WorshipWeekGrid dates={dates} days={daysMap} /> : <p className="text-navy-400">لا توجد بيانات بعد.</p>}
       </section>
     </div>
   );

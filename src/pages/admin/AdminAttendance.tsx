@@ -1,16 +1,16 @@
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
-import { Calculator, Check, CheckCheck, MessageSquarePlus, Save } from 'lucide-react';
+import { Calculator, Check, CheckCheck, Loader2, MessageSquarePlus, Save } from 'lucide-react';
 import { useData } from '@/context/DataContext';
 import { useToast } from '@/context/ToastContext';
 import PageHeader from '@/components/shared/PageHeader';
 import Avatar from '@/components/ui/Avatar';
 import { AttendancePicker, CommitmentSelect, NumberInput } from '@/components/admin/fields';
-import { emptyWorship } from '@/components/admin/SessionForm';
-import type { AttendanceStatus, CommitmentLevel, SessionRecord, WorshipKey, WorshipRecord } from '@/types';
-import { TODAY } from '@/data/mockData';
-import { suggestScore, worshipCount } from '@/utils/stats';
-import { cx, formatLongDate, worshipItems } from '@/utils/format';
+import type { AttendanceStatus, CommitmentLevel, DailyWorship, SessionRecord } from '@/types';
+import { TODAY } from '@/utils/today';
+import { suggestScore } from '@/utils/stats';
+import { weekDates, weekStartOf, weekWorshipScore } from '@/utils/worship';
+import { cx, formatLongDate } from '@/utils/format';
 
 interface Row {
   studentId: string;
@@ -23,7 +23,6 @@ interface Row {
   hasRev: boolean;
   revGrade?: number;
   revCompletion?: number;
-  worship: WorshipRecord;
   notes: string;
   showNotes: boolean;
 }
@@ -38,10 +37,22 @@ function Cell({ label, children, className }: { label: string; children: ReactNo
 }
 
 export default function AdminAttendance() {
-  const { students, sessions, upsertSessions, getRequirement } = useData();
+  const { students, sessions, upsertSessions, getRequirement, dailyWorship } = useData();
   const toast = useToast();
   const [date, setDate] = useState(TODAY);
   const [rows, setRows] = useState<Row[]>([]);
+
+  /** علامة أسبوع العبادات (سبت-خميس) المرتبط بهذا التاريخ، لكل طالب */
+  const weekWorshipByStudent = useMemo(() => {
+    const ws = weekStartOf(date);
+    const dates = weekDates(ws).filter((d) => d <= date);
+    const map = new Map<string, number>();
+    students.forEach((st) => {
+      const days = dates.map((d) => dailyWorship.find((w) => w.id === `${st.id}-${d}`)).filter((x): x is DailyWorship => !!x);
+      map.set(st.id, weekWorshipScore(days));
+    });
+    return map;
+  }, [students, dailyWorship, date]);
 
   // تعبئة الصفوف من السجلات الموجودة لهذا التاريخ (إن وُجدت)
   useEffect(() => {
@@ -59,7 +70,6 @@ export default function AdminAttendance() {
           hasRev: ex ? !!ex.revision : true,
           revGrade: ex?.revision?.grade ?? 90,
           revCompletion: ex?.revision?.completion ?? 100,
-          worship: ex?.worship ?? { ...emptyWorship },
           notes: ex?.notes ?? '',
           showNotes: !!ex?.notes,
         };
@@ -68,7 +78,6 @@ export default function AdminAttendance() {
   }, [date, students]);
 
   const patch = (id: string, p: Partial<Row>) => setRows((r) => r.map((x) => (x.studentId === id ? { ...x, ...p } : x)));
-  const toggleW = (id: string, k: WorshipKey) => setRows((r) => r.map((x) => (x.studentId === id ? { ...x, worship: { ...x.worship, [k]: !x.worship[k] } } : x)));
 
   const counts = useMemo(() => {
     const c = { present: 0, late: 0, absent: 0, excused: 0 };
@@ -82,12 +91,13 @@ export default function AdminAttendance() {
         ...x,
         score:
           x.attendance === 'present' || x.attendance === 'late'
-            ? suggestScore({ attendance: x.attendance, memGrade: x.hasMem ? x.memGrade : undefined, revGrade: x.hasRev ? x.revGrade : undefined, worship: x.worship })
+            ? suggestScore({ attendance: x.attendance, memGrade: x.hasMem ? x.memGrade : undefined, revGrade: x.hasRev ? x.revGrade : undefined, weekWorship: weekWorshipByStudent.get(x.studentId) })
             : undefined,
       })),
     );
 
-  const saveAll = () => {
+  const [saving, setSaving] = useState(false);
+  const saveAll = async () => {
     const recs: SessionRecord[] = rows.map((x) => {
       const id = `${x.studentId}-${date}`;
       const attended = x.attendance === 'present' || x.attendance === 'late';
@@ -100,17 +110,23 @@ export default function AdminAttendance() {
         date,
         attendance: x.attendance,
         commitment: x.commitment,
-        score: x.score ?? suggestScore({ attendance: x.attendance, memGrade: x.memGrade, revGrade: x.revGrade, worship: x.worship }),
+        score: x.score ?? suggestScore({ attendance: x.attendance, memGrade: x.memGrade, revGrade: x.revGrade, weekWorship: weekWorshipByStudent.get(x.studentId) }),
         memorization: x.hasMem
           ? { required: prev?.memorization?.required ?? req?.memorization ?? '', recited: prev?.memorization?.recited ?? '', completion: x.memCompletion ?? 0, grade: x.memGrade ?? 0 }
           : null,
         revision: x.hasRev ? { required: prev?.revision?.required ?? req?.revision ?? '', revised: prev?.revision?.revised ?? '', completion: x.revCompletion ?? 0, grade: x.revGrade ?? 0 } : null,
-        worship: x.worship,
         notes: x.notes || undefined,
       };
     });
-    upsertSessions(recs);
-    toast(`تم حفظ دوام ${recs.length} طالبًا`);
+    setSaving(true);
+    try {
+      await upsertSessions(recs);
+      toast(`تم حفظ دوام ${recs.length} طالبًا`);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'حدث خطأ أثناء الحفظ.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -140,24 +156,23 @@ export default function AdminAttendance() {
 
       <section className="card overflow-hidden">
         {/* رأس الأعمدة للشاشات العريضة */}
-        <div className="hidden grid-cols-[200px_240px_110px_76px_150px_150px_176px_40px] items-center gap-3 border-b border-navy-50 bg-navy-50/60 px-4 py-2.5 text-[12px] font-medium text-navy-500 2xl:grid">
+        <div className="hidden grid-cols-[200px_240px_110px_76px_150px_150px_100px_40px] items-center gap-3 border-b border-navy-50 bg-navy-50/60 px-4 py-2.5 text-[12px] font-medium text-navy-500 2xl:grid">
           <span>الطالب</span>
           <span>الحضور</span>
           <span>الالتزام</span>
           <span>العلامة</span>
           <span>الحفظ (علامة / إنجاز)</span>
           <span>المراجعة (علامة / إنجاز)</span>
-          <span>العبادات</span>
+          <span>علامة أسبوع العبادات</span>
           <span />
         </div>
         <ul className="divide-y divide-navy-50">
           {rows.map((r) => {
             const st = students.find((s) => s.id === r.studentId)!;
             const attended = r.attendance === 'present' || r.attendance === 'late';
-            const wc = worshipCount(r.worship);
             return (
               <li key={r.studentId} className={cx('px-4 py-3 transition', !attended && 'bg-paper/60')}>
-                <div className="grid grid-cols-2 items-end gap-3 md:grid-cols-4 2xl:grid-cols-[200px_240px_110px_76px_150px_150px_176px_40px] 2xl:items-center">
+                <div className="grid grid-cols-2 items-end gap-3 md:grid-cols-4 2xl:grid-cols-[200px_240px_110px_76px_150px_150px_100px_40px] 2xl:items-center">
                   <div className="col-span-2 flex items-center gap-3 md:col-span-4 2xl:col-span-1">
                     <Avatar name={st.name} src={st.photo} size={40} />
                     <span className="truncate text-[14px] font-bold text-navy-900">{st.name}</span>
@@ -193,21 +208,8 @@ export default function AdminAttendance() {
                       <NumberInput small value={r.hasRev ? r.revCompletion : undefined} onChange={(v) => patch(r.studentId, { revCompletion: v })} ariaLabel="إنجاز المراجعة" placeholder="%" />
                     </div>
                   </Cell>
-                  <Cell label={`العبادات ${wc.done}/${wc.total}`} className={cx('col-span-2 md:col-span-1', !attended && 'pointer-events-none opacity-40')}>
-                    <div className="flex items-center gap-1">
-                      {worshipItems.map((w) => (
-                        <button
-                          key={w.key}
-                          type="button"
-                          title={w.label}
-                          aria-label={w.label}
-                          aria-pressed={r.worship[w.key]}
-                          onClick={() => toggleW(r.studentId, w.key)}
-                          className={cx('h-[18px] w-[18px] rounded-full border-2 transition', r.worship[w.key] ? 'border-emerald-600 bg-emerald-600' : 'border-navy-200 bg-white hover:border-navy-400')}
-                        />
-                      ))}
-                      <span className="mr-1 hidden text-[11px] text-navy-400 2xl:inline">{wc.done}/8</span>
-                    </div>
+                  <Cell label="علامة أسبوع العبادات" className={cx(!attended && 'pointer-events-none opacity-40')}>
+                    <span className="text-[13px] font-bold text-navy-700">{Math.round(weekWorshipByStudent.get(r.studentId) ?? 0)}%</span>
                   </Cell>
                   <div className="flex justify-end">
                     <button onClick={() => patch(r.studentId, { showNotes: !r.showNotes })} className={cx('rounded-lg p-1.5 transition', r.notes ? 'text-burgundy-600' : 'text-navy-300 hover:text-navy-600')} aria-label="ملاحظات">
@@ -224,14 +226,14 @@ export default function AdminAttendance() {
         </ul>
       </section>
 
-      <p className="mt-3 text-[12px] text-navy-400">دوائر العبادات بالترتيب: {worshipItems.map((w) => w.label).join('، ')}. العلامة الفارغة تُحتسب تلقائيًا عند الحفظ.</p>
+      <p className="mt-3 text-[12px] text-navy-400">علامة أسبوع العبادات تُدخل من صفحة الطالب ← تبويب العبادات، وتدخل هنا تلقائيًا ضمن معادلة العلامة (20%).</p>
 
       <div className="sticky bottom-3 z-20 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-navy-100 bg-white/95 px-5 py-3 shadow-lift backdrop-blur">
         <span className="text-[13px] text-navy-500">
           {rows.length} طالبًا – حاضر {counts.present + counts.late} من {rows.length}
         </span>
-        <button onClick={saveAll} className="btn-accent px-10 py-3 text-[15px]">
-          <Save className="h-5 w-5" /> حفظ الجميع
+        <button onClick={saveAll} className="btn-accent px-10 py-3 text-[15px]" disabled={saving}>
+          {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />} حفظ الجميع
         </button>
       </div>
     </div>

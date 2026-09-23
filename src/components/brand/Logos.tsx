@@ -1,4 +1,4 @@
-import { PROJECT } from '@/data/mockData';
+import { PROJECT } from '@/data/project';
 import { cx } from '@/utils/format';
 
 /** شعارا المشروع والمركز كما هما دون أي تعديل */

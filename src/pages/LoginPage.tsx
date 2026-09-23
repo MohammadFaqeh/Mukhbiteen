@@ -1,39 +1,33 @@
 import { useState, type FormEvent } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, LockKeyhole, ShieldCheck, User, Users } from 'lucide-react';
+import { Eye, EyeOff, LockKeyhole, Loader2, Mail } from 'lucide-react';
 import BrandBackground from '@/components/brand/BrandBackground';
 import { CenterLogo, ProjectLogo } from '@/components/brand/Logos';
 import StarMark from '@/components/brand/StarMark';
-import Avatar from '@/components/ui/Avatar';
-import Select from '@/components/ui/Select';
 import { useAuth } from '@/context/AuthContext';
-import { useData } from '@/context/DataContext';
-import { PROJECT, demoAccounts } from '@/data/mockData';
+import { PROJECT } from '@/data/project';
+import { resolveLoginAlias } from '@/data/loginAliases';
 
 export default function LoginPage() {
-  const { user, login, loginAs } = useAuth();
-  const { students } = useData();
+  const { user, login } = useAuth();
   const navigate = useNavigate();
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [show, setShow] = useState(false);
   const [error, setError] = useState('');
-  const [previewStudent, setPreviewStudent] = useState('s01');
+  const [submitting, setSubmitting] = useState(false);
 
   if (user) return <Navigate to={user.role === 'admin' ? '/admin' : '/parent'} replace />;
 
-  const go = (role: 'admin' | 'parent') => navigate(role === 'admin' ? '/admin' : '/parent', { replace: true });
-
-  const submit = (e: FormEvent) => {
+  const submit = async (e: FormEvent) => {
     e.preventDefault();
-    const res = login(username, password);
+    setSubmitting(true);
+    setError('');
+    const res = await login(resolveLoginAlias(email), password);
+    setSubmitting(false);
     if (!res.ok) setError(res.error);
-    else go(res.role);
+    else navigate(res.role === 'admin' ? '/admin' : '/parent', { replace: true });
   };
-
-  const admin = demoAccounts.find((a) => a.role === 'admin')!;
-  const parent = demoAccounts.find((a) => a.role === 'parent')!;
-  const child = students.find((s) => s.id === previewStudent);
 
   return (
     <div className="relative min-h-screen">
@@ -72,11 +66,11 @@ export default function LoginPage() {
           <form onSubmit={submit} className="card mt-7 space-y-4 p-6">
             <div>
               <label className="field-label" htmlFor="u">
-                اسم المستخدم أو البريد الإلكتروني
+                البريد الإلكتروني
               </label>
               <div className="relative">
-                <User className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-navy-300" />
-                <input id="u" className="input pr-10" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="مثال: admin" autoComplete="username" />
+                <Mail className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-navy-300" />
+                <input id="u" type="text" className="input pr-10" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="example@email.com" autoComplete="username" />
               </div>
             </div>
             <div>
@@ -92,44 +86,12 @@ export default function LoginPage() {
               </div>
             </div>
             {error && <p className="rounded-xl bg-burgundy-50 px-3.5 py-2.5 text-[13px] text-burgundy-700">{error}</p>}
-            <button className="btn-primary w-full py-3 text-[15px]">تسجيل الدخول</button>
+            <button className="btn-primary w-full py-3 text-[15px]" disabled={submitting}>
+              {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+              تسجيل الدخول
+            </button>
           </form>
-
-          {/* الحسابات التجريبية */}
-          <div className="mt-6">
-            <div className="mb-3 flex items-center gap-3 text-[13px] text-navy-400">
-              <span className="h-px flex-1 bg-navy-100" />
-              دخول سريع بحساب تجريبي
-              <span className="h-px flex-1 bg-navy-100" />
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <button onClick={() => go(loginAs(admin))} className="card group flex flex-col items-start gap-2 p-4 text-right transition hover:border-navy-300">
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-navy-800 text-white">
-                  <ShieldCheck className="h-5 w-5" />
-                </span>
-                <span className="font-bold text-navy-900">الإدارة</span>
-                <span className="text-[12px] leading-5 text-navy-400">
-                  admin / admin123
-                  <br />
-                  إدارة الطلاب والدوام
-                </span>
-              </button>
-              <div className="card flex flex-col gap-2 p-4">
-                <button onClick={() => go(loginAs(parent, previewStudent))} className="flex flex-col items-start gap-2 text-right">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-burgundy-600 text-white">
-                    <Users className="h-5 w-5" />
-                  </span>
-                  <span className="font-bold text-navy-900">ولي الأمر</span>
-                  <span className="text-[12px] leading-5 text-navy-400">parent / parent123</span>
-                </button>
-                <div className="flex items-center gap-2">
-                  {child && <Avatar name={child.name} src={child.photo} size={28} />}
-                  <Select small className="flex-1" ariaLabel="تجربة صفحة الطالب" value={previewStudent} onChange={setPreviewStudent} options={students.map((s) => ({ value: s.id, label: s.name }))} />
-                </div>
-              </div>
-            </div>
-            <p className="mt-4 text-center text-[12px] text-navy-300">نسخة تجريبية للواجهة – لا يوجد اتصال بقاعدة بيانات بعد.</p>
-          </div>
+          <p className="mt-4 text-center text-[12px] text-navy-300">لإنشاء حساب جديد أو استعادة كلمة المرور، تواصل مع مشرف المشروع.</p>
         </section>
       </div>
     </div>

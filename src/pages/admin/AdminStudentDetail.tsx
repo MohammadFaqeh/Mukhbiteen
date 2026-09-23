@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowRight, BookOpen, CalendarCheck, CalendarPlus, HandHeart, PencilLine, RotateCcw, Trash2, TrendingUp, Trophy } from 'lucide-react';
+import { ArrowRight, BookOpen, CalendarCheck, CalendarPlus, HandHeart, Loader2, PencilLine, RotateCcw, Save, Trash2, TrendingUp, Trophy } from 'lucide-react';
 import { useData } from '@/context/DataContext';
 import { useToast } from '@/context/ToastContext';
-import type { SessionRecord, WorshipKey } from '@/types';
+import type { DailyWorship, SessionRecord } from '@/types';
 import { ArchPortrait } from '@/components/parent/StudentHero';
 import StatCard from '@/components/ui/StatCard';
 import TrendCard from '@/components/parent/TrendCard';
@@ -14,11 +14,13 @@ import Select from '@/components/ui/Select';
 import SessionForm from '@/components/admin/SessionForm';
 import NextRequirementForm from '@/components/admin/NextRequirementForm';
 import StudentFormModal from '@/components/admin/StudentFormModal';
-import WorshipGrid from '@/components/shared/WorshipGrid';
+import WorshipWeekGrid from '@/components/shared/WorshipWeekGrid';
 import SessionDetail from '@/components/shared/SessionDetail';
 import ReportsPanel from '@/components/shared/ReportsPanel';
 import SessionTimeline from '@/components/parent/SessionTimeline';
-import { studentSessions, studentStats, worshipPercent, availableMonths } from '@/utils/stats';
+import { studentSessions, studentStats } from '@/utils/stats';
+import { dailyWorshipScore, emptyDailyWorship, weekDates, weekStartOf, weekWorshipScore } from '@/utils/worship';
+import { TODAY } from '@/utils/today';
 import { cx, formatDate, formatLongDate, formatMonthKey, pct } from '@/utils/format';
 
 const TABS = [
@@ -36,10 +38,10 @@ export default function AdminStudentDetail() {
   const { id = '' } = useParams();
   const [params, setParams] = useSearchParams();
   const tab = (params.get('tab') as TabKey) || 'overview';
-  const { getStudent, sessions: all } = useData();
+  const { getStudent, sessions: all, dailyWorship } = useData();
   const student = getStudent(id);
   const sessions = useMemo(() => studentSessions(all, id), [all, id]);
-  const stats = useMemo(() => studentStats(all, id), [all, id]);
+  const stats = useMemo(() => studentStats(all, dailyWorship, id), [all, dailyWorship, id]);
   const [editStudent, setEditStudent] = useState(false);
 
   if (!student)
@@ -106,7 +108,7 @@ export default function AdminStudentDetail() {
         {tab === 'sessions' && <SessionsTab studentId={id} sessions={sessions} name={student.name} />}
         {tab === 'memorization' && <QuranTab kind="mem" studentId={id} sessions={sessions} />}
         {tab === 'revision' && <QuranTab kind="rev" studentId={id} sessions={sessions} />}
-        {tab === 'worship' && <WorshipTab sessions={sessions} />}
+        {tab === 'worship' && <WorshipTab studentId={id} />}
         {tab === 'next' && <NextRequirementForm studentId={id} />}
         {tab === 'reports' && <ReportsPanel studentName={student.name} dense />}
       </div>
@@ -138,9 +140,6 @@ function Overview({ sessions, stats, name }: { sessions: SessionRecord[]; stats:
               </p>
               <p>
                 <b className="text-navy-800">المراجعة:</b> {stats.lastAttended.revision?.required ?? '—'} ({stats.lastAttended.revision?.grade ?? '—'}/100)
-              </p>
-              <p>
-                <b className="text-navy-800">العبادات:</b> {pct(worshipPercent(stats.lastAttended.worship))}
               </p>
               {stats.lastAttended.notes && <p className="rounded-xl bg-sand-50 p-3 text-navy-600">{stats.lastAttended.notes}</p>}
             </div>
@@ -182,7 +181,6 @@ function SessionsTab({ studentId, sessions, name }: { studentId: string; session
                 <th className="px-3 py-3 font-medium">العلامة</th>
                 <th className="px-3 py-3 font-medium">الحفظ</th>
                 <th className="px-3 py-3 font-medium">المراجعة</th>
-                <th className="px-3 py-3 font-medium">العبادات</th>
                 <th className="px-5 py-3" />
               </tr>
             </thead>
@@ -201,17 +199,19 @@ function SessionsTab({ studentId, sessions, name }: { studentId: string; session
                   <td className="px-3 py-2.5 font-bold text-navy-900">{s.score ?? '—'}</td>
                   <td className="px-3 py-2.5 text-navy-600">{s.memorization ? `${s.memorization.grade} (${s.memorization.completion}%)` : '—'}</td>
                   <td className="px-3 py-2.5 text-navy-600">{s.revision ? `${s.revision.grade} (${s.revision.completion}%)` : '—'}</td>
-                  <td className="px-3 py-2.5 text-navy-600">{s.worship ? pct(worshipPercent(s.worship), 0) : '—'}</td>
                   <td className="px-5 py-2.5">
                     <div className="flex justify-end gap-1">
                       <button onClick={() => setEditing(s)} className="rounded-lg p-1.5 text-navy-500 hover:bg-navy-50" aria-label="تعديل">
                         <PencilLine className="h-4 w-4" />
                       </button>
                       <button
-                        onClick={() => {
-                          if (confirm('حذف هذا اليوم من سجل الطالب؟')) {
-                            deleteSession(s.id);
+                        onClick={async () => {
+                          if (!confirm('حذف هذا اليوم من سجل الطالب؟')) return;
+                          try {
+                            await deleteSession(s.id);
                             toast('تم حذف يوم الدوام');
+                          } catch (e) {
+                            toast(e instanceof Error ? e.message : 'حدث خطأ أثناء الحذف.');
                           }
                         }}
                         className="rounded-lg p-1.5 text-burgundy-500 hover:bg-burgundy-50"
@@ -297,69 +297,104 @@ function QuranTab({ kind, studentId, sessions }: { kind: 'mem' | 'rev'; studentI
 }
 
 /* ---------------- العبادات ---------------- */
-function WorshipTab({ sessions }: { sessions: SessionRecord[] }) {
-  const { upsertSessions } = useData();
+function WorshipTab({ studentId }: { studentId: string }) {
+  const { dailyWorship, upsertDailyWorship } = useData();
   const toast = useToast();
-  const days = sessions.filter((s) => s.worship);
-  const [dayId, setDayId] = useState(days[0]?.id ?? '');
-  const day = days.find((d) => d.id === dayId);
-  const [draft, setDraft] = useState(day?.worship);
-  const months = availableMonths(days);
+  const mine = useMemo(() => dailyWorship.filter((d) => d.studentId === studentId), [dailyWorship, studentId]);
 
-  const choose = (id: string) => {
-    setDayId(id);
-    setDraft(days.find((d) => d.id === id)?.worship);
+  const weeks = useMemo(() => {
+    const set = new Set(mine.map((d) => weekStartOf(d.date)));
+    set.add(weekStartOf(TODAY));
+    return [...set].sort().reverse();
+  }, [mine]);
+  const [weekStart, setWeekStart] = useState(weeks[0]);
+  const dates = useMemo(() => weekDates(weekStart), [weekStart]);
+  const [draft, setDraft] = useState<Record<string, DailyWorship>>({});
+
+  useEffect(() => {
+    const map: Record<string, DailyWorship> = {};
+    dates.forEach((date) => {
+      map[date] = mine.find((d) => d.date === date) ?? emptyDailyWorship(studentId, date);
+    });
+    setDraft(map);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weekStart]);
+
+  const patch = (date: string, p: Partial<DailyWorship>) => setDraft((d) => ({ ...d, [date]: { ...d[date], ...p } }));
+  const score = weekWorshipScore(Object.values(draft));
+
+  const months = useMemo(() => [...new Set(mine.map((d) => d.date.slice(0, 7)))].sort().reverse(), [mine]);
+
+  const [saving, setSaving] = useState(false);
+  const save = async () => {
+    setSaving(true);
+    try {
+      await upsertDailyWorship(Object.values(draft));
+      toast('تم حفظ جدول العبادات لهذا الأسبوع');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'حدث خطأ أثناء الحفظ.');
+    } finally {
+      setSaving(false);
+    }
   };
-  const toggle = (k: WorshipKey) => draft && setDraft({ ...draft, [k]: !draft[k] });
 
   return (
-    <div className="grid gap-4 xl:grid-cols-12">
-      <section className="card p-5 xl:col-span-7">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h3 className="section-title">جدول العبادات</h3>
-          <Select className="w-60" ariaLabel="اختيار اليوم" value={dayId} onChange={choose} options={days.slice(0, 20).map((d) => ({ value: d.id, label: formatLongDate(d.date) }))} />
+    <div className="space-y-4">
+      <section className="card flex flex-wrap items-center justify-between gap-3 p-5">
+        <div>
+          <h3 className="section-title">جدول العبادات الأسبوعي</h3>
+          <p className="mt-0.5 text-[12px] text-navy-400">من السبت إلى الخميس — يوم الجمعة هو يوم الدوام بالمركز ويُقيَّم مباشرة هناك</p>
         </div>
-        {draft ? (
-          <>
-            <WorshipGrid value={draft} onToggle={toggle} />
-            <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-navy-50/60 p-4">
-              <div>
-                <p className="text-[12px] text-navy-500">نسبة اليوم</p>
-                <p className="text-[26px] font-extrabold text-navy-900">{pct(worshipPercent(draft))}</p>
-              </div>
-              <button
-                className="btn-accent"
-                onClick={() => {
-                  if (day) upsertSessions([{ ...day, worship: draft }]);
-                  toast('تم حفظ جدول العبادات');
-                }}
-              >
-                حفظ العبادات
-              </button>
-            </div>
-          </>
-        ) : (
-          <p className="text-navy-400">لا توجد أيام مسجلة.</p>
-        )}
+        <div className="flex items-center gap-3">
+          <Select className="w-56" ariaLabel="اختيار الأسبوع" value={weekStart} onChange={setWeekStart} options={weeks.map((w) => ({ value: w, label: `أسبوع ${formatDate(w)}` }))} />
+          <div className="rounded-xl bg-navy-50/70 px-4 py-2 text-center">
+            <p className="text-[11px] text-navy-400">علامة الأسبوع</p>
+            <p className="text-[20px] font-extrabold text-navy-900">{pct(score)}</p>
+          </div>
+        </div>
       </section>
-      <section className="card p-5 xl:col-span-5">
-        <h3 className="section-title mb-4">معدل العبادات الشهري</h3>
-        <div className="space-y-3">
-          {months.map((m) => {
-            const list = days.filter((d) => d.date.startsWith(m));
-            const v = Math.round(list.reduce((a, d) => a + worshipPercent(d.worship), 0) / (list.length || 1));
-            return (
-              <div key={m}>
-                <div className="mb-1 flex justify-between text-[13px]">
-                  <span className="text-navy-600">{formatMonthKey(m)}</span>
-                  <b className="text-navy-900">{v}%</b>
+
+      <section className="card p-5">
+        <WorshipWeekGrid dates={dates} days={draft} editable onChange={patch} />
+        <div className="mt-4 flex items-center justify-between gap-3 rounded-xl bg-navy-50/60 px-4 py-3">
+          <label className="flex items-center gap-2 text-[13px] font-medium text-navy-700">
+            <input
+              type="checkbox"
+              className="h-4 w-4 accent-emerald-600"
+              checked={Object.values(draft).some((d) => d.charity)}
+              onChange={(e) => setDraft((d) => Object.fromEntries(Object.entries(d).map(([date, v]) => [date, { ...v, charity: e.target.checked }])))}
+            />
+            تصدّق الطالب مرة على الأقل خلال هذا الأسبوع
+          </label>
+        </div>
+      </section>
+
+      <div className="flex justify-end">
+        <button className="btn-accent px-8" onClick={save} disabled={saving}>
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} حفظ جدول الأسبوع
+        </button>
+      </div>
+
+      {months.length > 0 && (
+        <section className="card p-5">
+          <h3 className="section-title mb-4">معدل العبادات الشهري</h3>
+          <div className="space-y-3">
+            {months.map((m) => {
+              const list = mine.filter((d) => d.date.startsWith(m));
+              const v = Math.round(list.reduce((a, d) => a + dailyWorshipScore(d), 0) / (list.length || 1));
+              return (
+                <div key={m}>
+                  <div className="mb-1 flex justify-between text-[13px]">
+                    <span className="text-navy-600">{formatMonthKey(m)}</span>
+                    <b className="text-navy-900">{v}%</b>
+                  </div>
+                  <ProgressBar value={v} tone="green" />
                 </div>
-                <ProgressBar value={v} tone="green" />
-              </div>
-            );
-          })}
-        </div>
-      </section>
+              );
+            })}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

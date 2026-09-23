@@ -9,17 +9,17 @@ import { AttendanceBadge } from '@/components/ui/Badge';
 import AdminStudentCard from '@/components/admin/AdminStudentCard';
 import StudentFormModal from '@/components/admin/StudentFormModal';
 import type { Student } from '@/types';
-import { TODAY } from '@/data/mockData';
+import { TODAY } from '@/utils/today';
 import { attendanceRate, studentStats } from '@/utils/stats';
 import { formatDate, pct, round1 } from '@/utils/format';
 
 export default function AdminDashboard() {
-  const { students, sessions } = useData();
+  const { students, sessions, dailyWorship } = useData();
   const [editing, setEditing] = useState<Student | null>(null);
   const [adding, setAdding] = useState(false);
 
   const data = useMemo(() => {
-    const stats = students.map((s) => ({ s, st: studentStats(sessions, s.id) })).sort((a, b) => b.st.cumulative - a.st.cumulative);
+    const stats = students.map((s) => ({ s, st: studentStats(sessions, dailyWorship, s.id) })).sort((a, b) => b.st.cumulative - a.st.cumulative);
     const groupAvg = round1(stats.reduce((a, b) => a + b.st.cumulative, 0) / (stats.length || 1));
     const latestDate = sessions[0]?.date ?? TODAY;
     const today = sessions.filter((x) => x.date === latestDate);
@@ -30,7 +30,7 @@ export default function AdminDashboard() {
       return { date: d, score: Math.round(sc.reduce((a, b) => a + b, 0) / (sc.length || 1)) };
     });
     return { stats, groupAvg, attendance: attendanceRate(sessions), latestDate, today, present, trend };
-  }, [students, sessions]);
+  }, [students, sessions, dailyWorship]);
 
   return (
     <div className="space-y-5">

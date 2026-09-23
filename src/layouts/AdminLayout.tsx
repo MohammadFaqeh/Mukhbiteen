@@ -1,14 +1,15 @@
 import { Outlet, useNavigate } from 'react-router-dom';
-import { CalendarPlus, FileText, GalleryHorizontalEnd, LayoutDashboard, RotateCcw, Users } from 'lucide-react';
+import { CalendarPlus, FileText, GalleryHorizontalEnd, LayoutDashboard, Users } from 'lucide-react';
 import Sidebar, { type NavItem } from './Sidebar';
 import BrandBackground from '@/components/brand/BrandBackground';
 import Footer from '@/components/brand/Footer';
 import { LogoPair } from '@/components/brand/Logos';
 import { useAuth } from '@/context/AuthContext';
 import { useData } from '@/context/DataContext';
-import { useToast } from '@/context/ToastContext';
-import { PROJECT, TODAY, supervisor } from '@/data/mockData';
-import { formatLongDate } from '@/utils/format';
+import { useSidebarCollapsed } from '@/hooks/useSidebarCollapsed';
+import { PROJECT, supervisor } from '@/data/project';
+import { TODAY } from '@/utils/today';
+import { cx, formatLongDate } from '@/utils/format';
 
 const items: NavItem[] = [
   { to: '/admin', label: 'لوحة التحكم', icon: LayoutDashboard, end: true },
@@ -20,9 +21,9 @@ const items: NavItem[] = [
 
 export default function AdminLayout() {
   const { logout, user } = useAuth();
-  const { resetDemo } = useData();
-  const toast = useToast();
+  const { loading, error } = useData();
   const navigate = useNavigate();
+  const [collapsed, toggleCollapsed] = useSidebarCollapsed();
   return (
     <div className="min-h-screen">
       <BrandBackground variant="admin" />
@@ -30,24 +31,14 @@ export default function AdminLayout() {
         tone="admin"
         subtitle="لوحة الإدارة"
         items={items}
-        onLogout={() => {
-          logout();
+        collapsed={collapsed}
+        onToggleCollapsed={toggleCollapsed}
+        onLogout={async () => {
+          await logout();
           navigate('/login');
         }}
-        footer={
-          <button
-            onClick={() => {
-              resetDemo();
-              toast('تمت إعادة البيانات التجريبية الأصلية');
-            }}
-            className="flex w-full items-center gap-3 rounded-xl border border-dashed border-navy-200 px-3.5 py-2 text-[12px] text-navy-500 transition hover:bg-white"
-          >
-            <RotateCcw className="h-4 w-4" />
-            إعادة ضبط البيانات التجريبية
-          </button>
-        }
       />
-      <main className="px-4 pb-8 pt-4 sm:px-6 lg:mr-[260px] lg:px-8 lg:pt-6">
+      <main className={cx('px-4 pb-8 pt-4 transition-[margin] duration-200 sm:px-6 lg:px-8 lg:pt-6', collapsed ? 'lg:mr-[92px]' : 'lg:mr-[260px]')}>
         <div className="mx-auto max-w-[1400px]">
           <header className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-navy-100/70 bg-white/80 px-5 py-3 shadow-soft backdrop-blur">
             <div className="flex items-center gap-4">
@@ -67,7 +58,13 @@ export default function AdminLayout() {
               <img src={supervisor.photo} alt="" className="h-10 w-10 rounded-full bg-navy-900 object-cover object-[50%_20%] ring-2 ring-white" />
             </div>
           </header>
-          <Outlet />
+          {loading ? (
+            <p className="card-quiet p-10 text-center text-navy-400">جارٍ تحميل البيانات...</p>
+          ) : error ? (
+            <p className="card-quiet p-10 text-center text-burgundy-600">تعذّر تحميل البيانات: {error}</p>
+          ) : (
+            <Outlet />
+          )}
           <Footer />
         </div>
       </main>

@@ -1,8 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { LogOut, Menu, X, type LucideIcon } from 'lucide-react';
+import { LogOut, Menu, PanelRightClose, PanelRightOpen, X, type LucideIcon } from 'lucide-react';
 import { ProjectLogo, CenterLogo } from '@/components/brand/Logos';
-import { PROJECT } from '@/data/mockData';
+import { PROJECT } from '@/data/project';
 import { cx } from '@/utils/format';
 
 export interface NavItem {
@@ -18,9 +18,11 @@ interface Props {
   footer?: ReactNode; // بطاقة صغيرة أسفل القائمة
   tone: 'parent' | 'admin';
   subtitle: string;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
 }
 
-function NavList({ items, onNavigate, tone }: { items: NavItem[]; onNavigate?: () => void; tone: Props['tone'] }) {
+function NavList({ items, onNavigate, tone, collapsed }: { items: NavItem[]; onNavigate?: () => void; tone: Props['tone']; collapsed?: boolean }) {
   return (
     <nav className="flex flex-col gap-1">
       {items.map(({ to, label, icon: Icon, end }) => (
@@ -29,9 +31,11 @@ function NavList({ items, onNavigate, tone }: { items: NavItem[]; onNavigate?: (
           to={to}
           end={end}
           onClick={onNavigate}
+          title={collapsed ? label : undefined}
           className={({ isActive }) =>
             cx(
               'group relative flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-[14px] font-medium transition',
+              collapsed && 'justify-center px-0',
               isActive
                 ? tone === 'parent'
                   ? 'bg-white text-navy-900 shadow-soft'
@@ -42,9 +46,9 @@ function NavList({ items, onNavigate, tone }: { items: NavItem[]; onNavigate?: (
         >
           {({ isActive }) => (
             <>
-              {isActive && tone === 'parent' && <span className="absolute -right-4 top-1/2 h-6 w-1 -translate-y-1/2 rounded-l-full bg-burgundy-600" />}
-              <Icon className={cx('h-[18px] w-[18px]', isActive && tone === 'parent' && 'text-burgundy-600')} strokeWidth={1.8} />
-              {label}
+              {isActive && tone === 'parent' && !collapsed && <span className="absolute -right-4 top-1/2 h-6 w-1 -translate-y-1/2 rounded-l-full bg-burgundy-600" />}
+              <Icon className={cx('h-[18px] w-[18px] shrink-0', isActive && tone === 'parent' && 'text-burgundy-600')} strokeWidth={1.8} />
+              {!collapsed && label}
             </>
           )}
         </NavLink>
@@ -53,39 +57,65 @@ function NavList({ items, onNavigate, tone }: { items: NavItem[]; onNavigate?: (
   );
 }
 
-export default function Sidebar({ items, onLogout, footer, tone, subtitle }: Props) {
+export default function Sidebar({ items, onLogout, footer, tone, subtitle, collapsed, onToggleCollapsed }: Props) {
   const [open, setOpen] = useState(false);
   const loc = useLocation();
   useEffect(() => setOpen(false), [loc.pathname]);
 
-  const inner = (onNavigate?: () => void) => (
+  const inner = (onNavigate?: () => void, showCollapseToggle?: boolean, isCollapsed?: boolean) => (
     <div className="flex h-full flex-col">
+      {showCollapseToggle && (
+        <button
+          onClick={onToggleCollapsed}
+          className="mb-1 self-start rounded-lg p-1.5 text-navy-400 transition hover:bg-white/70 hover:text-navy-800"
+          aria-label={isCollapsed ? 'توسيع القائمة الجانبية' : 'طي القائمة الجانبية'}
+          title={isCollapsed ? 'توسيع القائمة' : 'طي القائمة'}
+        >
+          {isCollapsed ? <PanelRightOpen className="h-[18px] w-[18px]" /> : <PanelRightClose className="h-[18px] w-[18px]" />}
+        </button>
+      )}
       <div className="flex flex-col items-center px-2 pb-5 pt-2 text-center">
-        <ProjectLogo className="h-24 w-auto" />
-        <p className="mt-1 text-[13px] font-bold text-navy-800">{PROJECT.name}</p>
-        <p className="text-[11px] text-navy-400">{subtitle}</p>
+        <ProjectLogo className={cx('w-auto transition-all', isCollapsed ? 'h-11' : 'h-24')} />
+        {!isCollapsed && (
+          <>
+            <p className="mt-1 text-[13px] font-bold text-navy-800">{PROJECT.name}</p>
+            <p className="text-[11px] text-navy-400">{subtitle}</p>
+          </>
+        )}
       </div>
       <div className="mb-4 h-px bg-gradient-to-l from-transparent via-navy-100 to-transparent" />
       <div className="scrollbar-thin flex-1 overflow-y-auto">
-        <NavList items={items} onNavigate={onNavigate} tone={tone} />
+        <NavList items={items} onNavigate={onNavigate} tone={tone} collapsed={isCollapsed} />
       </div>
-      {footer && <div className="mt-4">{footer}</div>}
-      <button onClick={onLogout} className="mt-3 flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-[14px] font-medium text-burgundy-600 transition hover:bg-burgundy-50">
-        <LogOut className="h-[18px] w-[18px]" strokeWidth={1.8} />
-        تسجيل الخروج
+      {footer && !isCollapsed && <div className="mt-4">{footer}</div>}
+      <button
+        onClick={onLogout}
+        title={isCollapsed ? 'تسجيل الخروج' : undefined}
+        className={cx('mt-3 flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-[14px] font-medium text-burgundy-600 transition hover:bg-burgundy-50', isCollapsed && 'justify-center px-0')}
+      >
+        <LogOut className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} />
+        {!isCollapsed && 'تسجيل الخروج'}
       </button>
-      <div className="mt-3 flex items-center justify-center gap-2 border-t border-navy-100/70 pt-3 text-[11px] text-navy-400">
-        <CenterLogo className="h-7 w-auto" />
-        {PROJECT.center}
-      </div>
+      {!isCollapsed && (
+        <div className="mt-3 flex items-center justify-center gap-2 border-t border-navy-100/70 pt-3 text-[11px] text-navy-400">
+          <CenterLogo className="h-7 w-auto" />
+          {PROJECT.center}
+        </div>
+      )}
     </div>
   );
 
   return (
     <>
       {/* Desktop */}
-      <aside className={cx('fixed inset-y-0 right-0 z-30 hidden w-[260px] border-l border-navy-100/60 p-5 lg:block', tone === 'parent' ? 'bg-sand-50/70 backdrop-blur-md' : 'bg-white/80 backdrop-blur-md')}>
-        {inner()}
+      <aside
+        className={cx(
+          'fixed inset-y-0 right-0 z-30 hidden border-l border-navy-100/60 p-5 transition-[width] duration-200 lg:block',
+          collapsed ? 'w-[92px]' : 'w-[260px]',
+          tone === 'parent' ? 'bg-sand-50/70 backdrop-blur-md' : 'bg-white/80 backdrop-blur-md',
+        )}
+      >
+        {inner(undefined, true, collapsed)}
       </aside>
 
       {/* Mobile top bar */}

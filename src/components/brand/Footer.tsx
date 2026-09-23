@@ -1,4 +1,4 @@
-import { PROJECT } from '@/data/mockData';
+import { PROJECT } from '@/data/project';
 
 export default function Footer() {
   return (

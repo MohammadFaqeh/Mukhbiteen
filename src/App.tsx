@@ -26,7 +26,10 @@ function RequireRole({ role, children }: { role: Role; children: ReactElement })
 }
 
 export default function App() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  if (loading) {
+    return <div className="flex min-h-screen items-center justify-center text-navy-400">جارٍ التحميل...</div>;
+  }
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />

@@ -1,69 +1,82 @@
-/**
- * تسجيل دخول تجريبي (Demo) فقط.
- * لاحقًا: استبدل login/logout باستدعاء supabase.auth.signInWithPassword / signOut
- * واقرأ الدور (role) وstudentId من جدول profiles.
- */
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
-import type { DemoAccount, Role } from '@/types';
-import { demoAccounts } from '@/data/mockData';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import type { Role } from '@/types';
+import { supabase } from '@/lib/supabase';
+import { supervisor } from '@/data/project';
 
 interface Session {
   role: Role;
-  username: string;
   displayName: string;
   studentId?: string;
+  email: string;
 }
 
 interface AuthValue {
   user: Session | null;
-  login: (username: string, password: string) => { ok: true; role: Role } | { ok: false; error: string };
-  loginAs: (account: DemoAccount, studentId?: string) => Role;
-  logout: () => void;
+  loading: boolean;
+  login: (email: string, password: string) => Promise<{ ok: true; role: Role } | { ok: false; error: string }>;
+  logout: () => Promise<void>;
 }
 
-const KEY = 'mukhbiteen.demo.session';
 const AuthContext = createContext<AuthValue | null>(null);
 
-function readSession(): Session | null {
-  try {
-    const raw = sessionStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as Session) : null;
-  } catch {
-    return null;
-  }
+/**
+ * الحسابات تُنشأ من لوحة Supabase مباشرة بلا اسم عرض، فيرجع display_name = البريد افتراضيًا.
+ * هنا نستبدله باسم مناسب: اسم المشرف الثابت، أو اسم ولي أمر الطالب المرتبط بالحساب.
+ */
+async function loadProfile(userId: string, email: string): Promise<Session | null> {
+  const { data, error } = await supabase.from('profiles').select('role, student_id, display_name, students(guardian_name)').eq('id', userId).single();
+  if (error || !data) return null;
+  const hasRealName = data.display_name && data.display_name !== email;
+  const student = data.students as { guardian_name?: string } | null;
+  const displayName = hasRealName ? data.display_name! : data.role === 'admin' ? supervisor.name : student?.guardian_name || email;
+  return { role: data.role, studentId: data.student_id ?? undefined, displayName, email };
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<Session | null>(readSession);
+  const [user, setUser] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const persist = (s: Session | null) => {
-    setUser(s);
-    try {
-      if (s) sessionStorage.setItem(KEY, JSON.stringify(s));
-      else sessionStorage.removeItem(KEY);
-    } catch {
-      /* التخزين غير متاح – نكتفي بالحالة في الذاكرة */
-    }
-  };
+  useEffect(() => {
+    let active = true;
 
-  const loginAs = useCallback((a: DemoAccount, studentId?: string) => {
-    persist({ role: a.role, username: a.username, displayName: a.displayName, studentId: studentId ?? a.studentId });
-    return a.role;
+    supabase.auth.getSession().then(async ({ data }) => {
+      const session = data.session;
+      const profile = session?.user ? await loadProfile(session.user.id, session.user.email ?? '') : null;
+      if (active) {
+        setUser(profile);
+        setLoading(false);
+      }
+    });
+
+    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const profile = session?.user ? await loadProfile(session.user.id, session.user.email ?? '') : null;
+      if (active) setUser(profile);
+    });
+
+    return () => {
+      active = false;
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
-  const login = useCallback<AuthValue['login']>(
-    (username, password) => {
-      const u = username.trim().toLowerCase();
-      const acc = demoAccounts.find((a) => a.username.toLowerCase() === u && a.password === password);
-      if (!acc) return { ok: false, error: 'اسم المستخدم أو كلمة المرور غير صحيحة. جرّب أحد الحسابين التجريبيين.' };
-      return { ok: true, role: loginAs(acc) };
-    },
-    [loginAs],
-  );
+  const login = useCallback<AuthValue['login']>(async (email, password) => {
+    const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    if (error || !data.user) return { ok: false, error: 'البريد الإلكتروني أو كلمة المرور غير صحيحة.' };
+    const profile = await loadProfile(data.user.id, data.user.email ?? '');
+    if (!profile) {
+      await supabase.auth.signOut();
+      return { ok: false, error: 'لا يوجد حساب مفعّل بهذا البريد. تواصل مع المشرف.' };
+    }
+    setUser(profile);
+    return { ok: true, role: profile.role };
+  }, []);
 
-  const logout = useCallback(() => persist(null), []);
+  const logout = useCallback(async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+  }, []);
 
-  const value = useMemo(() => ({ user, login, loginAs, logout }), [user, login, loginAs, logout]);
+  const value = useMemo(() => ({ user, loading, login, logout }), [user, loading, login, logout]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

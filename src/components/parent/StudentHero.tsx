@@ -4,7 +4,7 @@ import type { StudentStats } from '@/utils/stats';
 import { CommitmentBadge } from '@/components/ui/Badge';
 import StarMark from '@/components/brand/StarMark';
 import { CenterLogo } from '@/components/brand/Logos';
-import { PROJECT } from '@/data/mockData';
+import { PROJECT } from '@/data/project';
 import { formatDate } from '@/utils/format';
 
 /** صورة الطالب داخل إطار على شكل محراب */

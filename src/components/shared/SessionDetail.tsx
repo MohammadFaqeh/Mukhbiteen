@@ -1,11 +1,9 @@
 import type { ReactNode } from 'react';
-import { BookOpen, CalendarDays, HandHeart, MessageSquareText, RotateCcw } from 'lucide-react';
+import { BookOpen, CalendarDays, MessageSquareText, RotateCcw } from 'lucide-react';
 import type { SessionRecord } from '@/types';
 import Modal from '@/components/ui/Modal';
 import { AttendanceBadge, CommitmentBadge } from '@/components/ui/Badge';
 import { ProgressBar } from '@/components/ui/Progress';
-import WorshipGrid from './WorshipGrid';
-import { worshipCount } from '@/utils/stats';
 import { formatLongDate } from '@/utils/format';
 
 function Block({ icon: Icon, title, children }: { icon: typeof BookOpen; title: string; children: ReactNode }) {
@@ -32,7 +30,6 @@ function KV({ k, v }: { k: string; v: ReactNode }) {
 export default function SessionDetail({ session, onClose, studentName }: { session: SessionRecord | null; onClose: () => void; studentName?: string }) {
   const s = session;
   const attended = s && (s.attendance === 'present' || s.attendance === 'late');
-  const wc = worshipCount(s?.worship);
   return (
     <Modal open={!!s} onClose={onClose} size="lg" title="تفاصيل يوم الدوام" subtitle={studentName}>
       {s && (
@@ -98,11 +95,6 @@ export default function SessionDetail({ session, onClose, studentName }: { sessi
                   <p className="text-[13px] text-navy-400">لا توجد مراجعة في هذا اليوم.</p>
                 )}
               </Block>
-              <div className="md:col-span-2">
-                <Block icon={HandHeart} title={`العبادات ${wc.done}/${wc.total}`}>
-                  <WorshipGrid value={s.worship} compact />
-                </Block>
-              </div>
             </div>
           ) : (
             <p className="rounded-2xl bg-sand-50 p-4 text-[14px] text-navy-600">لم يحضر الطالب هذا اليوم، لذلك لا توجد علامات مسجلة.</p>

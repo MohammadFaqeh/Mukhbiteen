@@ -1,17 +1,14 @@
-import { useEffect, useState } from 'react';
-import { BookOpen, Calculator, HandHeart, RotateCcw, Save } from 'lucide-react';
-import type { SessionRecord, WorshipKey, WorshipRecord } from '@/types';
+import { useEffect, useMemo, useState } from 'react';
+import { BookOpen, Calculator, Loader2, RotateCcw, Save } from 'lucide-react';
+import type { DailyWorship, SessionRecord } from '@/types';
 import Toggle from '@/components/ui/Toggle';
-import WorshipGrid from '@/components/shared/WorshipGrid';
-import { ProgressBar } from '@/components/ui/Progress';
 import { AttendancePicker, CommitmentSelect, Field, NumberInput } from './fields';
 import { useData } from '@/context/DataContext';
 import { useToast } from '@/context/ToastContext';
-import { TODAY } from '@/data/mockData';
-import { suggestScore, worshipPercent } from '@/utils/stats';
+import { TODAY } from '@/utils/today';
+import { suggestScore } from '@/utils/stats';
+import { weekDates, weekStartOf, weekWorshipScore } from '@/utils/worship';
 import { pct } from '@/utils/format';
-
-export const emptyWorship: WorshipRecord = { fajr: false, dhuhr: false, asr: false, maghrib: false, isha: false, morningAdhkar: false, eveningAdhkar: false, quranWird: false };
 
 function blank(studentId: string, date = TODAY): SessionRecord {
   return {
@@ -23,7 +20,6 @@ function blank(studentId: string, date = TODAY): SessionRecord {
     score: undefined,
     memorization: { required: '', recited: '', completion: 100, grade: 90, notes: '' },
     revision: { required: '', revised: '', completion: 100, grade: 90, notes: '' },
-    worship: { ...emptyWorship },
     notes: '',
   };
 }
@@ -37,14 +33,14 @@ interface Props {
 
 /** نموذج إضافة / تعديل يوم دوام لطالب */
 export default function SessionForm({ studentId, initial, onSaved, onCancel }: Props) {
-  const { upsertSessions, deleteSession, sessions } = useData();
+  const { upsertSessions, deleteSession, sessions, dailyWorship } = useData();
   const toast = useToast();
   const [s, setS] = useState<SessionRecord>(() => initial ?? blank(studentId));
   const [hasMem, setHasMem] = useState(initial ? !!initial.memorization : true);
   const [hasRev, setHasRev] = useState(initial ? !!initial.revision : true);
 
   useEffect(() => {
-    setS(initial ? { ...blank(studentId, initial.date), ...initial, memorization: initial.memorization ?? blank(studentId).memorization, revision: initial.revision ?? blank(studentId).revision, worship: initial.worship ?? { ...emptyWorship } } : blank(studentId));
+    setS(initial ? { ...blank(studentId, initial.date), ...initial, memorization: initial.memorization ?? blank(studentId).memorization, revision: initial.revision ?? blank(studentId).revision } : blank(studentId));
     setHasMem(initial ? !!initial.memorization : true);
     setHasRev(initial ? !!initial.revision : true);
   }, [initial, studentId]);
@@ -53,27 +49,42 @@ export default function SessionForm({ studentId, initial, onSaved, onCancel }: P
   const set = <K extends keyof SessionRecord>(k: K, v: SessionRecord[K]) => setS((x) => ({ ...x, [k]: v }));
   const setMem = (patch: Partial<NonNullable<SessionRecord['memorization']>>) => setS((x) => ({ ...x, memorization: { ...x.memorization!, ...patch } }));
   const setRev = (patch: Partial<NonNullable<SessionRecord['revision']>>) => setS((x) => ({ ...x, revision: { ...x.revision!, ...patch } }));
-  const toggleW = (k: WorshipKey) => setS((x) => ({ ...x, worship: { ...(x.worship ?? emptyWorship), [k]: !x.worship?.[k] } }));
+
+  /** علامة أسبوع العبادات (سبت-خميس) المرتبط بتاريخ هذا اليوم، لاستخدامها في الاحتساب التلقائي */
+  const weekWorship = useMemo(() => {
+    const days = weekDates(weekStartOf(s.date))
+      .filter((d) => d <= s.date)
+      .map((d) => dailyWorship.find((w) => w.id === `${studentId}-${d}`))
+      .filter((x): x is DailyWorship => !!x);
+    return weekWorshipScore(days);
+  }, [dailyWorship, studentId, s.date]);
 
   const auto = () =>
-    set(
-      'score',
-      suggestScore({ attendance: s.attendance, memGrade: hasMem ? s.memorization?.grade : undefined, revGrade: hasRev ? s.revision?.grade : undefined, worship: s.worship }),
-    );
+    set('score', suggestScore({ attendance: s.attendance, memGrade: hasMem ? s.memorization?.grade : undefined, revGrade: hasRev ? s.revision?.grade : undefined, weekWorship }));
 
-  const exists = !initial && sessions.some((x) => x.id === `${studentId}-${s.date}`);
+  const newId = `${studentId}-${s.date}`;
+  const dateChanged = !!initial && initial.id !== newId;
+  const collidesWithOther = sessions.some((x) => x.id === newId && x.id !== initial?.id);
+  const exists = (!initial || dateChanged) && collidesWithOther;
 
-  const save = () => {
+  const [saving, setSaving] = useState(false);
+  const save = async () => {
+    if (exists && !confirm('يوجد سجل آخر لهذا الطالب في نفس التاريخ، سيتم استبداله. هل تريد المتابعة؟')) return;
     const record: SessionRecord = attended
-      ? { ...s, id: `${studentId}-${s.date}`, memorization: hasMem ? s.memorization : null, revision: hasRev ? s.revision : null, score: s.score ?? suggestScore({ attendance: s.attendance, memGrade: s.memorization?.grade, revGrade: s.revision?.grade, worship: s.worship }) }
-      : { id: `${studentId}-${s.date}`, studentId, date: s.date, attendance: s.attendance, notes: s.notes };
-    if (initial && initial.id !== record.id) deleteSession(initial.id); // تغيّر التاريخ
-    upsertSessions([record]);
-    toast('تم حفظ يوم الدوام');
-    onSaved?.(record);
+      ? { ...s, id: newId, memorization: hasMem ? s.memorization : null, revision: hasRev ? s.revision : null, score: s.score ?? suggestScore({ attendance: s.attendance, memGrade: s.memorization?.grade, revGrade: s.revision?.grade, weekWorship }) }
+      : { id: newId, studentId, date: s.date, attendance: s.attendance, notes: s.notes };
+    setSaving(true);
+    try {
+      if (dateChanged) await deleteSession(initial!.id); // تغيّر التاريخ
+      await upsertSessions([record]);
+      toast('تم حفظ يوم الدوام');
+      onSaved?.(record);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'حدث خطأ أثناء الحفظ.');
+    } finally {
+      setSaving(false);
+    }
   };
-
-  const wp = worshipPercent(s.worship);
 
   return (
     <div className="space-y-4">
@@ -103,7 +114,9 @@ export default function SessionForm({ studentId, initial, onSaved, onCancel }: P
           </Field>
         </div>
         {exists && <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-[12px] text-amber-700">يوجد سجل لهذا الطالب في نفس التاريخ، وسيتم استبداله عند الحفظ.</p>}
-        <p className="mt-3 text-[12px] text-navy-400">زر الآلة الحاسبة يقترح العلامة: حضور 10% + حفظ 30% + مراجعة 30% + عبادات 20% + تقييم 10%.</p>
+        <p className="mt-3 text-[12px] text-navy-400">
+          زر الآلة الحاسبة يقترح العلامة: حضور 10% + حفظ 30% + مراجعة 30% + عبادات 20% (علامة أسبوع العبادات الحالي: {pct(weekWorship)}) + تقييم 10%.
+        </p>
       </section>
 
       {attended ? (
@@ -161,32 +174,9 @@ export default function SessionForm({ studentId, initial, onSaved, onCancel }: P
               </div>
             )}
           </section>
-
-          {/* العبادات */}
-          <section className="card p-5 xl:col-span-2">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h3 className="section-title flex items-center gap-2">
-                <HandHeart className="h-4 w-4 text-emerald-700" /> جدول العبادات
-              </h3>
-              <div className="flex gap-2">
-                <button type="button" className="btn-soft py-1.5 text-[12px]" onClick={() => set('worship', Object.fromEntries(Object.keys(emptyWorship).map((k) => [k, true])) as WorshipRecord)}>
-                  تحديد الكل
-                </button>
-                <button type="button" className="btn-soft py-1.5 text-[12px]" onClick={() => set('worship', { ...emptyWorship })}>
-                  مسح الكل
-                </button>
-              </div>
-            </div>
-            <WorshipGrid value={s.worship} onToggle={toggleW} />
-            <div className="mt-4 flex items-center gap-3">
-              <span className="text-[13px] text-navy-500">نسبة اليوم:</span>
-              <ProgressBar value={wp} tone="green" className="max-w-xs" />
-              <b className="text-[16px] text-navy-900">{pct(wp)}</b>
-            </div>
-          </section>
         </div>
       ) : (
-        <p className="card-quiet p-5 text-[14px] text-navy-500">الطالب غير حاضر في هذا اليوم، لا حاجة لإدخال الحفظ والمراجعة والعبادات.</p>
+        <p className="card-quiet p-5 text-[14px] text-navy-500">الطالب غير حاضر في هذا اليوم، لا حاجة لإدخال الحفظ والمراجعة.</p>
       )}
 
       <div className="flex justify-end gap-2">
@@ -195,8 +185,8 @@ export default function SessionForm({ studentId, initial, onSaved, onCancel }: P
             إلغاء
           </button>
         )}
-        <button className="btn-accent px-6" onClick={save}>
-          <Save className="h-4 w-4" />
+        <button className="btn-accent px-6" onClick={save} disabled={saving}>
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           حفظ يوم الدوام
         </button>
       </div>

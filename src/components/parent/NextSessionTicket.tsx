@@ -1,6 +1,6 @@
 import { BookMarked, CalendarDays, Hourglass, ListChecks, NotebookPen, RotateCcw } from 'lucide-react';
 import type { NextRequirement } from '@/types';
-import { TODAY } from '@/data/mockData';
+import { TODAY } from '@/utils/today';
 import { cx, daysBetween, formatDate, formatNumericDate, remainingLabel, weekday } from '@/utils/format';
 
 /**

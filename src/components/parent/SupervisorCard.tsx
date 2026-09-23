@@ -1,4 +1,4 @@
-import { supervisor } from '@/data/mockData';
+import { supervisor } from '@/data/project';
 
 export default function SupervisorCard() {
   return (

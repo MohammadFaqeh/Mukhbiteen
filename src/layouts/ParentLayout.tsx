@@ -5,7 +5,10 @@ import BrandBackground from '@/components/brand/BrandBackground';
 import Footer from '@/components/brand/Footer';
 import Avatar from '@/components/ui/Avatar';
 import { useAuth } from '@/context/AuthContext';
+import { useData } from '@/context/DataContext';
 import { useParentStudent } from '@/hooks/useParentStudent';
+import { useSidebarCollapsed } from '@/hooks/useSidebarCollapsed';
+import { cx } from '@/utils/format';
 
 const items: NavItem[] = [
   { to: '/parent', label: 'الرئيسية', icon: House, end: true },
@@ -18,8 +21,10 @@ const items: NavItem[] = [
 
 export default function ParentLayout() {
   const { logout } = useAuth();
+  const { loading, error } = useData();
   const navigate = useNavigate();
   const { student } = useParentStudent();
+  const [collapsed, toggleCollapsed] = useSidebarCollapsed();
 
   return (
     <div className="min-h-screen">
@@ -28,8 +33,10 @@ export default function ParentLayout() {
         tone="parent"
         subtitle="صفحة الطالب"
         items={items}
-        onLogout={() => {
-          logout();
+        collapsed={collapsed}
+        onToggleCollapsed={toggleCollapsed}
+        onLogout={async () => {
+          await logout();
           navigate('/login');
         }}
         footer={
@@ -44,9 +51,15 @@ export default function ParentLayout() {
           )
         }
       />
-      <main className="px-4 pb-8 pt-5 sm:px-6 lg:mr-[260px] lg:px-10 lg:pt-8">
+      <main className={cx('px-4 pb-8 pt-5 transition-[margin] duration-200 sm:px-6 lg:px-10 lg:pt-8', collapsed ? 'lg:mr-[92px]' : 'lg:mr-[260px]')}>
         <div className="mx-auto max-w-[1280px]">
-          <Outlet />
+          {loading ? (
+            <p className="card-quiet p-10 text-center text-navy-400">جارٍ تحميل البيانات...</p>
+          ) : error ? (
+            <p className="card-quiet p-10 text-center text-burgundy-600">تعذّر تحميل البيانات: {error}</p>
+          ) : (
+            <Outlet />
+          )}
           <Footer />
         </div>
       </main>

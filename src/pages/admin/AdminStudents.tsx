@@ -16,7 +16,7 @@ import { cx, pct } from '@/utils/format';
 type Sort = 'avg' | 'name' | 'attendance';
 
 export default function AdminStudents() {
-  const { students, sessions } = useData();
+  const { students, sessions, dailyWorship } = useData();
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState<'all' | CommitmentLevel>('all');
   const [sort, setSort] = useState<Sort>('avg');
@@ -25,10 +25,10 @@ export default function AdminStudents() {
 
   const rows = useMemo(() => {
     const r = students
-      .map((s) => ({ s, st: studentStats(sessions, s.id) }))
-      .filter(({ s, st }) => (s.name.includes(q.trim()) || s.username.includes(q.trim())) && (filter === 'all' || st.commitment === filter));
+      .map((s) => ({ s, st: studentStats(sessions, dailyWorship, s.id) }))
+      .filter(({ s, st }) => (s.name.includes(q.trim()) || (s.guardianEmail ?? '').includes(q.trim())) && (filter === 'all' || st.commitment === filter));
     return r.sort((a, b) => (sort === 'name' ? a.s.name.localeCompare(b.s.name, 'ar') : sort === 'attendance' ? b.st.attendance - a.st.attendance : b.st.cumulative - a.st.cumulative));
-  }, [students, sessions, q, filter, sort]);
+  }, [students, sessions, dailyWorship, q, filter, sort]);
 
   return (
     <div>
@@ -46,7 +46,7 @@ export default function AdminStudents() {
       <div className="card mb-4 flex flex-wrap items-center gap-3 p-3">
         <div className="relative min-w-[220px] flex-1">
           <Search className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-navy-300" />
-          <input className="input pr-10" placeholder="ابحث باسم الطالب أو اسم المستخدم" value={q} onChange={(e) => setQ(e.target.value)} />
+          <input className="input pr-10" placeholder="ابحث باسم الطالب أو بريد ولي الأمر" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
         <Select
           className="w-40"
@@ -115,7 +115,7 @@ export default function AdminStudents() {
                           <div>
                             <p className="font-bold text-navy-900">{s.name}</p>
                             <p className="text-[11px] text-navy-400" dir="ltr">
-                              {s.username}
+                              {s.guardianEmail || '—'}
                             </p>
                           </div>
                         </div>

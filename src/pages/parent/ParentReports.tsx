@@ -7,12 +7,12 @@ import { formatMonthKey, pct } from '@/utils/format';
 import { ProgressBar } from '@/components/ui/Progress';
 
 export default function ParentReports() {
-  const { student, sessions } = useParentStudent();
+  const { student, sessions, worship } = useParentStudent();
   const months = useMemo(() => availableMonths(sessions), [sessions]);
   if (!student) return null;
   const rows = months.map((m) => {
     const monthSessions = sessions.filter((s) => s.date.startsWith(m));
-    const st = studentStats(monthSessions, student.id, m);
+    const st = studentStats(monthSessions, worship, student.id, m);
     return { m, ...st, count: monthSessions.length };
   });
   return (
