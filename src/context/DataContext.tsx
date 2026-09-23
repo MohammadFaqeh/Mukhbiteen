@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { Activity, DailyWorship, NextRequirement, SessionRecord, Student } from '@/types';
+import type { Activity, DailyWorship, HonorBoard, NextRequirement, SessionRecord, Student } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import {
@@ -7,6 +7,8 @@ import {
   activityToRow,
   dailyWorshipFromRow,
   dailyWorshipToRow,
+  honorBoardFromRow,
+  honorBoardToRow,
   requirementFromRow,
   requirementToRow,
   sessionFromRow,
@@ -21,6 +23,7 @@ interface AppData {
   dailyWorship: DailyWorship[];
   nextRequirements: NextRequirement[];
   activities: Activity[];
+  honorBoards: HonorBoard[];
 }
 
 interface DataValue extends AppData {
@@ -37,11 +40,13 @@ interface DataValue extends AppData {
   addActivity: (a: Omit<Activity, 'id'>) => Promise<void>;
   updateActivity: (id: string, patch: Partial<Activity>) => Promise<void>;
   deleteActivity: (id: string) => Promise<void>;
+  publishHonorBoard: (b: Omit<HonorBoard, 'id' | 'createdAt' | 'published'>) => Promise<HonorBoard>;
+  unpublishHonorBoard: (id: string) => Promise<void>;
 }
 
 const DataContext = createContext<DataValue | null>(null);
 
-const empty: AppData = { students: [], sessions: [], dailyWorship: [], nextRequirements: [], activities: [] };
+const empty: AppData = { students: [], sessions: [], dailyWorship: [], nextRequirements: [], activities: [], honorBoards: [] };
 
 export function DataProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -52,14 +57,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const loadAll = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const [students, sessions, dailyWorship, nextRequirements, activities] = await Promise.all([
+    const [students, sessions, dailyWorship, nextRequirements, activities, honorBoards] = await Promise.all([
       supabase.from('students').select('*').order('name'),
       supabase.from('sessions').select('*'),
       supabase.from('daily_worship').select('*'),
       supabase.from('next_requirements').select('*'),
       supabase.from('activities').select('*'),
+      supabase.from('honor_boards').select('*'),
     ]);
-    const firstError = [students, sessions, dailyWorship, nextRequirements, activities].find((r) => r.error)?.error;
+    const firstError = [students, sessions, dailyWorship, nextRequirements, activities, honorBoards].find((r) => r.error)?.error;
     if (firstError) {
       setError(firstError.message);
       setLoading(false);
@@ -71,6 +77,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       dailyWorship: (dailyWorship.data ?? []).map(dailyWorshipFromRow).sort((a, b) => b.date.localeCompare(a.date)),
       nextRequirements: (nextRequirements.data ?? []).map(requirementFromRow),
       activities: (activities.data ?? []).map(activityFromRow),
+      honorBoards: (honorBoards.data ?? []).map(honorBoardFromRow).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     });
     setLoading(false);
   }, []);
@@ -158,6 +165,22 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setData((d) => ({ ...d, activities: d.activities.filter((a) => a.id !== id) }));
   }, []);
 
+  const publishHonorBoard = useCallback(async (board: Omit<HonorBoard, 'id' | 'createdAt' | 'published'>) => {
+    const created: HonorBoard = { ...board, id: `hb${Date.now().toString(36)}`, published: true, createdAt: new Date().toISOString() };
+    const { error: unpubErr } = await supabase.from('honor_boards').update({ published: false }).eq('published', true);
+    if (unpubErr) throw new Error(unpubErr.message);
+    const { error: err } = await supabase.from('honor_boards').insert(honorBoardToRow(created));
+    if (err) throw new Error(err.message);
+    setData((d) => ({ ...d, honorBoards: [created, ...d.honorBoards.map((h) => ({ ...h, published: false }))] }));
+    return created;
+  }, []);
+
+  const unpublishHonorBoard = useCallback(async (id: string) => {
+    const { error: err } = await supabase.from('honor_boards').update({ published: false }).eq('id', id);
+    if (err) throw new Error(err.message);
+    setData((d) => ({ ...d, honorBoards: d.honorBoards.map((h) => (h.id === id ? { ...h, published: false } : h)) }));
+  }, []);
+
   const value = useMemo<DataValue>(
     () => ({
       ...data,
@@ -174,8 +197,27 @@ export function DataProvider({ children }: { children: ReactNode }) {
       addActivity,
       updateActivity,
       deleteActivity,
+      publishHonorBoard,
+      unpublishHonorBoard,
     }),
-    [data, loading, error, getStudent, getRequirement, addStudent, updateStudent, upsertSessions, deleteSession, upsertDailyWorship, saveRequirement, addActivity, updateActivity, deleteActivity],
+    [
+      data,
+      loading,
+      error,
+      getStudent,
+      getRequirement,
+      addStudent,
+      updateStudent,
+      upsertSessions,
+      deleteSession,
+      upsertDailyWorship,
+      saveRequirement,
+      addActivity,
+      updateActivity,
+      deleteActivity,
+      publishHonorBoard,
+      unpublishHonorBoard,
+    ],
   );
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 }

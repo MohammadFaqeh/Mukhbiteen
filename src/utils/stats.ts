@@ -67,6 +67,26 @@ export function studentStats(all: SessionRecord[], dailyWorship: DailyWorship[],
   };
 }
 
+export interface RangeStats {
+  average: number;
+  attendance: number;
+  worship: number;
+  sessionsCount: number;
+}
+
+/** إحصائيات طالب خلال فترة زمنية محددة (from/to شاملتان) — تُستخدم بالتقارير ولوحة الشرف */
+export function studentStatsInRange(all: SessionRecord[], dailyWorship: DailyWorship[], studentId: string, from: string, to: string): RangeStats {
+  const list = all.filter((s) => s.studentId === studentId && s.date >= from && s.date <= to);
+  const scored = list.filter((s) => attended(s) && typeof s.score === 'number');
+  const worshipDays = dailyWorship.filter((d) => d.studentId === studentId && d.date >= from && d.date <= to);
+  return {
+    average: avg(scored.map((s) => s.score!)),
+    attendance: attendanceRate(list),
+    worship: avg(worshipDays.map((d) => dailyWorshipScore(d))),
+    sessionsCount: list.length,
+  };
+}
+
 export function studentSessions(all: SessionRecord[], studentId: string) {
   return all.filter((s) => s.studentId === studentId).sort((a, b) => b.date.localeCompare(a.date));
 }

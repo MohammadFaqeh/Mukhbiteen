@@ -2,7 +2,7 @@
  * تحويل بين أعمدة قاعدة البيانات (snake_case) وأنواع التطبيق (camelCase).
  * الحقول المتداخلة (memorization, revision, prayers) تُخزَّن كما هي (jsonb) بلا تحويل إضافي.
  */
-import type { Activity, DailyWorship, NextRequirement, SessionRecord, Student } from '@/types';
+import type { Activity, DailyWorship, HonorBoard, NextRequirement, SessionRecord, Student } from '@/types';
 
 export function studentFromRow(r: any): Student {
   return {
@@ -150,4 +150,28 @@ export function activityToRow(a: Partial<Activity>) {
   if (a.date !== undefined) row.date = a.date;
   if (a.durationDays !== undefined) row.duration_days = a.durationDays;
   return row;
+}
+
+export function honorBoardFromRow(r: any): HonorBoard {
+  return {
+    id: r.id,
+    title: r.title,
+    periodFrom: r.period_from,
+    periodTo: r.period_to,
+    published: r.published,
+    entries: r.entries ?? [],
+    createdAt: r.created_at,
+  };
+}
+
+export function honorBoardToRow(h: HonorBoard) {
+  return {
+    id: h.id,
+    title: h.title,
+    period_from: h.periodFrom,
+    period_to: h.periodTo,
+    published: h.published,
+    entries: h.entries,
+    created_at: h.createdAt,
+  };
 }

@@ -100,3 +100,25 @@ export interface Supervisor {
   title: string;
   photo: string;
 }
+
+export interface HonorBoardEntry {
+  studentId: string;
+  name: string;
+  photo?: string;
+  average: number;
+  rank: number;
+}
+
+/**
+ * لوحة الشرف: لقطة مجمّدة من ترتيب المجموعة لحظة النشر (لا تتغيّر لاحقًا حتى لو تعدّلت البيانات).
+ * لا تظهر لأولياء الأمور إلا إذا published = true، ويُظهرها الموقع لكل الأهالي دفعة واحدة.
+ */
+export interface HonorBoard {
+  id: string;
+  title: string;
+  periodFrom: string;
+  periodTo: string;
+  published: boolean;
+  entries: HonorBoardEntry[];
+  createdAt: string;
+}

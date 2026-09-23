@@ -1,5 +1,6 @@
 import { useParentStudent } from '@/hooks/useParentStudent';
 import StudentHero from '@/components/parent/StudentHero';
+import HonorBoardCard from '@/components/parent/HonorBoardCard';
 import Slideshow from '@/components/parent/Slideshow';
 import NextSessionTicket from '@/components/parent/NextSessionTicket';
 import StatsRow from '@/components/parent/StatsRow';
@@ -25,6 +26,8 @@ export default function ParentHome() {
   return (
     <div className="space-y-4 sm:space-y-5">
       <StudentHero student={student} stats={stats} />
+
+      <HonorBoardCard />
 
       <div className="grid gap-4 sm:gap-5 lg:grid-cols-12">
         <NextSessionTicket req={requirement} className="lg:col-span-7 xl:col-span-8" />

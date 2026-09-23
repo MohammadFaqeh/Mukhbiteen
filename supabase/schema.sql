@@ -84,6 +84,18 @@ create table if not exists public.activities (
   duration_days int not null default 6
 );
 
+-- لوحة الشرف: لقطة مجمّدة من ترتيب المجموعة وقت النشر، تُخزَّن جاهزة (entries) بدل استعلام حي
+-- حتى لا يحتاج ولي الأمر صلاحية قراءة بيانات بقية الطلاب
+create table if not exists public.honor_boards (
+  id text primary key,
+  title text not null,
+  period_from date not null,
+  period_to date not null,
+  published boolean not null default false,
+  entries jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now()
+);
+
 -- ------------------------------------------------------------------
 --  صلاحيات أساسية على الجداول (لازمة قبل RLS، وإلا "permission denied")
 --  التطبيق لا يستخدم إلا مستخدمين مسجّلين دخول (authenticated) أبدًا،
@@ -95,7 +107,8 @@ grant select, insert, update, delete on
   public.sessions,
   public.daily_worship,
   public.next_requirements,
-  public.activities
+  public.activities,
+  public.honor_boards
 to authenticated;
 grant select, insert, update on public.profiles to authenticated;
 
@@ -152,6 +165,7 @@ alter table public.sessions enable row level security;
 alter table public.daily_worship enable row level security;
 alter table public.next_requirements enable row level security;
 alter table public.activities enable row level security;
+alter table public.honor_boards enable row level security;
 
 drop policy if exists "admin full access students" on public.students;
 create policy "admin full access students" on public.students for all using (public.is_admin()) with check (public.is_admin());
@@ -182,6 +196,11 @@ drop policy if exists "admin full access activities" on public.activities;
 create policy "admin full access activities" on public.activities for all using (public.is_admin()) with check (public.is_admin());
 drop policy if exists "authenticated reads activities" on public.activities;
 create policy "authenticated reads activities" on public.activities for select using (auth.uid() is not null);
+
+drop policy if exists "admin full access honor_boards" on public.honor_boards;
+create policy "admin full access honor_boards" on public.honor_boards for all using (public.is_admin()) with check (public.is_admin());
+drop policy if exists "authenticated reads published honor_boards" on public.honor_boards;
+create policy "authenticated reads published honor_boards" on public.honor_boards for select using (published = true);
 
 -- ------------------------------------------------------------------
 --  تخزين الصور (Storage)
