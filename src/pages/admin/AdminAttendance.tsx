@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Calculator, Check, CheckCheck, Loader2, MessageSquarePlus, Save } from 'lucide-react';
 import { useData } from '@/context/DataContext';
 import { useToast } from '@/context/ToastContext';
@@ -36,11 +36,24 @@ function Cell({ label, children, className }: { label: string; children: ReactNo
   );
 }
 
+const DRAFT_KEY = 'mukhbiteen.draft.attendance';
+
+function loadDraft(): { date: string; rows: Row[] } | null {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function AdminAttendance() {
   const { students, sessions, upsertSessions, getRequirement, dailyWorship } = useData();
   const toast = useToast();
-  const [date, setDate] = useState(TODAY);
-  const [rows, setRows] = useState<Row[]>([]);
+  const draft = useRef(loadDraft()).current; // يُقرأ مرة واحدة فقط عند فتح الصفحة
+  const [date, setDate] = useState(draft?.date ?? TODAY);
+  const [rows, setRows] = useState<Row[]>(draft?.rows ?? []);
+  const skipNextPopulate = useRef(!!draft);
 
   /** علامة أسبوع العبادات (سبت-خميس) المرتبط بهذا التاريخ، لكل طالب */
   const weekWorshipByStudent = useMemo(() => {
@@ -54,8 +67,13 @@ export default function AdminAttendance() {
     return map;
   }, [students, dailyWorship, date]);
 
-  // تعبئة الصفوف من السجلات الموجودة لهذا التاريخ (إن وُجدت)
+  // تعبئة الصفوف من السجلات الموجودة لهذا التاريخ (إن وُجدت).
+  // معتمدة على [date] فقط بقصد: تغيّر مرجع students/sessions بالخلفية (كإعادة تحميل صامتة) ما لازم يمسح تعديلات غير محفوظة.
   useEffect(() => {
+    if (skipNextPopulate.current) {
+      skipNextPopulate.current = false; // أول تشغيل بعد استرجاع Draft محفوظ — لا تستبدله
+      return;
+    }
     setRows(
       students.map((st) => {
         const ex = sessions.find((s) => s.studentId === st.id && s.date === date);
@@ -75,7 +93,17 @@ export default function AdminAttendance() {
         };
       }),
     );
-  }, [date, students]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date]);
+
+  // حفظ Draft بالجلسة عند أي تعديل، حتى ينجو من إعادة تحميل الصفحة أو التنقل بين التبويبات
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ date, rows }));
+    } catch {
+      /* التخزين غير متاح */
+    }
+  }, [date, rows]);
 
   const patch = (id: string, p: Partial<Row>) => setRows((r) => r.map((x) => (x.studentId === id ? { ...x, ...p } : x)));
 
@@ -121,6 +149,11 @@ export default function AdminAttendance() {
     setSaving(true);
     try {
       await upsertSessions(recs);
+      try {
+        sessionStorage.removeItem(DRAFT_KEY);
+      } catch {
+        /* التخزين غير متاح */
+      }
       toast(`تم حفظ دوام ${recs.length} طالبًا`);
     } catch (e) {
       toast(e instanceof Error ? e.message : 'حدث خطأ أثناء الحفظ.');

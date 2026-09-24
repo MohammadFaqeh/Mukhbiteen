@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Activity, DailyWorship, HonorBoard, NextRequirement, SessionRecord, Student } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
@@ -53,9 +53,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<AppData>(empty);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const loadedOnce = useRef(false);
 
   const loadAll = useCallback(async () => {
-    setLoading(true);
+    // نظهر شاشة "جارٍ التحميل" فقط أول مرة — أي إعادة تحميل لاحقة بالخلفية ما لازم تمسح الصفحة الحالية وتعيد بنائها
+    if (!loadedOnce.current) setLoading(true);
     setError(null);
     const [students, sessions, dailyWorship, nextRequirements, activities, honorBoards] = await Promise.all([
       supabase.from('students').select('*').order('name'),
@@ -79,18 +81,25 @@ export function DataProvider({ children }: { children: ReactNode }) {
       activities: (activities.data ?? []).map(activityFromRow),
       honorBoards: (honorBoards.data ?? []).map(honorBoardFromRow).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     });
+    loadedOnce.current = true;
     setLoading(false);
   }, []);
 
+  // مفتاح ثابت يعتمد على هوية المستخدم فعليًا (دور + طالب + بريد)، بدل الاعتماد على مرجع الكائن user
+  // الذي يتغيّر أحيانًا بدون أي تغيير حقيقي (مثلًا عند عودة التركيز لتبويب الموقع)
+  const authKey = user ? `${user.role}|${user.studentId ?? ''}|${user.email}` : null;
+
   useEffect(() => {
-    if (user) {
+    if (authKey) {
       loadAll();
     } else {
+      loadedOnce.current = false;
       setData(empty);
       setError(null);
       setLoading(false);
     }
-  }, [user, loadAll]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authKey, loadAll]);
 
   const getStudent = useCallback((id: string) => data.students.find((s) => s.id === id), [data.students]);
   const getRequirement = useCallback((sid: string) => data.nextRequirements.find((r) => r.studentId === sid), [data.nextRequirements]);

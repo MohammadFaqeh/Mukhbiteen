@@ -23,6 +23,12 @@ const AuthContext = createContext<AuthValue | null>(null);
  * الحسابات تُنشأ من لوحة Supabase مباشرة بلا اسم عرض، فيرجع display_name = البريد افتراضيًا.
  * هنا نستبدله باسم مناسب: اسم المشرف الثابت، أو اسم ولي أمر الطالب المرتبط بالحساب.
  */
+function sameIdentity(a: Session | null, b: Session | null): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return a.role === b.role && a.studentId === b.studentId && a.email === b.email && a.displayName === b.displayName;
+}
+
 async function loadProfile(userId: string, email: string): Promise<Session | null> {
   const { data, error } = await supabase.from('profiles').select('role, student_id, display_name, students(guardian_name)').eq('id', userId).single();
   if (error || !data) return null;
@@ -48,9 +54,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // Supabase يعيد التحقق من الجلسة تلقائيًا كل ما رجع تبويب/نافذة الموقع يصير مرئي (حتى لو ما تغيّر شي فعليًا)،
+      // ويصدر حدث مثل TOKEN_REFRESHED بنفس الهوية. تجاهله هون يمنع إعادة تحميل كل بيانات الموقع ومسح أي تعديل غير محفوظ.
+      if (event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') return;
       const profile = session?.user ? await loadProfile(session.user.id, session.user.email ?? '') : null;
-      if (active) setUser(profile);
+      if (!active) return;
+      setUser((prev) => (sameIdentity(prev, profile) ? prev : profile));
     });
 
     return () => {
