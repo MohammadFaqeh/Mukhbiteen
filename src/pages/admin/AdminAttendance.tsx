@@ -1,16 +1,18 @@
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Calculator, Check, CheckCheck, Loader2, MessageSquarePlus, Save } from 'lucide-react';
+import { Calculator, Check, CheckCheck, Download, FileUp, Loader2, MessageSquarePlus, Save } from 'lucide-react';
 import { useData } from '@/context/DataContext';
 import { useToast } from '@/context/ToastContext';
 import PageHeader from '@/components/shared/PageHeader';
 import Avatar from '@/components/ui/Avatar';
 import { AttendancePicker, CommitmentSelect, NumberInput } from '@/components/admin/fields';
+import ImportExcelModal, { type MatchedImportRow } from '@/components/admin/ImportExcelModal';
 import type { AttendanceStatus, CommitmentLevel, DailyWorship, SessionRecord } from '@/types';
 import { TODAY } from '@/utils/today';
 import { suggestScore } from '@/utils/stats';
 import { weekDates, weekStartOf, weekWorshipScore } from '@/utils/worship';
 import { completionPercent } from '@/utils/quran';
+import { downloadAttendanceTemplate } from '@/utils/excel';
 import { cx, formatLongDate, pct } from '@/utils/format';
 
 interface Row {
@@ -22,10 +24,12 @@ interface Row {
   memGrade?: number;
   memRequiredPages: number;
   memCompletedPages: number;
+  memRecited?: string;
   hasRev: boolean;
   revGrade?: number;
   revRequiredPages: number;
   revCompletedPages: number;
+  revRevised?: string;
   notes: string;
   showNotes: boolean;
 }
@@ -89,10 +93,12 @@ export default function AdminAttendance() {
           memGrade: ex?.memorization?.grade ?? 90,
           memRequiredPages: ex?.memorization?.requiredPages ?? 0,
           memCompletedPages: ex?.memorization?.completedPages ?? 0,
+          memRecited: ex?.memorization?.recited,
           hasRev: ex ? !!ex.revision : true,
           revGrade: ex?.revision?.grade ?? 90,
           revRequiredPages: ex?.revision?.requiredPages ?? 0,
           revCompletedPages: ex?.revision?.completedPages ?? 0,
+          revRevised: ex?.revision?.revised,
           notes: ex?.notes ?? '',
           showNotes: !!ex?.notes,
         };
@@ -129,6 +135,37 @@ export default function AdminAttendance() {
       })),
     );
 
+  const [importOpen, setImportOpen] = useState(false);
+  const applyImport = (imported: MatchedImportRow[]) => {
+    const usable = imported.filter((r) => r.studentId && !r.ignored);
+    setRows((prev) => {
+      const map = new Map(prev.map((r) => [r.studentId, r]));
+      usable.forEach((imp) => {
+        const existing = map.get(imp.studentId!);
+        if (!existing) return;
+        const memGiven = imp.memRequiredPages !== undefined || imp.memCompletedPages !== undefined;
+        const revGiven = imp.revRequiredPages !== undefined || imp.revCompletedPages !== undefined;
+        map.set(imp.studentId!, {
+          ...existing,
+          hasMem: memGiven ? true : existing.hasMem,
+          memRequiredPages: imp.memRequiredPages ?? existing.memRequiredPages,
+          memCompletedPages: imp.memCompletedPages ?? existing.memCompletedPages,
+          memGrade: imp.memGrade ?? existing.memGrade,
+          memRecited: imp.memRecited ?? existing.memRecited,
+          hasRev: revGiven ? true : existing.hasRev,
+          revRequiredPages: imp.revRequiredPages ?? existing.revRequiredPages,
+          revCompletedPages: imp.revCompletedPages ?? existing.revCompletedPages,
+          revGrade: imp.revGrade ?? existing.revGrade,
+          revRevised: imp.revRevised ?? existing.revRevised,
+          notes: imp.notes || existing.notes,
+          showNotes: !!(imp.notes || existing.notes),
+        });
+      });
+      return [...map.values()];
+    });
+    toast(`تم استيراد ${usable.length} طالبًا من الملف — راجع البيانات واضغط "حفظ الجميع" لاعتمادها نهائيًا`);
+  };
+
   const [saving, setSaving] = useState(false);
   const saveAll = async () => {
     const recs: SessionRecord[] = rows.map((x) => {
@@ -147,7 +184,7 @@ export default function AdminAttendance() {
         memorization: x.hasMem
           ? {
               required: prev?.memorization?.required ?? req?.memorization ?? '',
-              recited: prev?.memorization?.recited ?? '',
+              recited: x.memRecited ?? prev?.memorization?.recited ?? '',
               requiredPages: x.memRequiredPages,
               completedPages: x.memCompletedPages,
               completion: completionPercent(x.memRequiredPages, x.memCompletedPages),
@@ -157,7 +194,7 @@ export default function AdminAttendance() {
         revision: x.hasRev
           ? {
               required: prev?.revision?.required ?? req?.revision ?? '',
-              revised: prev?.revision?.revised ?? '',
+              revised: x.revRevised ?? prev?.revision?.revised ?? '',
               requiredPages: x.revRequiredPages,
               completedPages: x.revCompletedPages,
               completion: completionPercent(x.revRequiredPages, x.revCompletedPages),
@@ -196,6 +233,12 @@ export default function AdminAttendance() {
             </button>
             <button className="btn-soft" onClick={calcAll}>
               <Calculator className="h-4 w-4" /> احتساب العلامات
+            </button>
+            <button className="btn-ghost" onClick={() => downloadAttendanceTemplate(students).catch(() => toast('تعذّر إنشاء ملف القالب.'))}>
+              <Download className="h-4 w-4" /> تحميل قالب Excel
+            </button>
+            <button className="btn-soft" onClick={() => setImportOpen(true)}>
+              <FileUp className="h-4 w-4" /> استيراد Excel
             </button>
           </>
         }
@@ -294,6 +337,8 @@ export default function AdminAttendance() {
           {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />} حفظ الجميع
         </button>
       </div>
+
+      <ImportExcelModal open={importOpen} onClose={() => setImportOpen(false)} students={students} onApprove={applyImport} />
     </div>
   );
 }
