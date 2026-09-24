@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { BookOpen, Calculator, Loader2, RotateCcw, Save } from 'lucide-react';
-import type { DailyWorship, SessionRecord } from '@/types';
+import type { DailyWorship, MemorizationEntry, RevisionEntry, SessionRecord } from '@/types';
 import Toggle from '@/components/ui/Toggle';
+import { ProgressBar } from '@/components/ui/Progress';
+import { CompletionBadge } from '@/components/ui/Badge';
 import { AttendancePicker, CommitmentSelect, Field, NumberInput } from './fields';
 import { useData } from '@/context/DataContext';
 import { useToast } from '@/context/ToastContext';
 import { TODAY } from '@/utils/today';
 import { suggestScore } from '@/utils/stats';
 import { weekDates, weekStartOf, weekWorshipScore } from '@/utils/worship';
+import { completionPercent, completionStatus } from '@/utils/quran';
 import { pct } from '@/utils/format';
 
 function blank(studentId: string, date = TODAY): SessionRecord {
@@ -18,8 +21,8 @@ function blank(studentId: string, date = TODAY): SessionRecord {
     attendance: 'present',
     commitment: 'excellent',
     score: undefined,
-    memorization: { required: '', recited: '', completion: 100, grade: 90, notes: '' },
-    revision: { required: '', revised: '', completion: 100, grade: 90, notes: '' },
+    memorization: { required: '', recited: '', requiredPages: 0, completedPages: 0, completion: 0, grade: 90, notes: '' },
+    revision: { required: '', revised: '', requiredPages: 0, completedPages: 0, completion: 0, grade: 90, notes: '' },
     notes: '',
   };
 }
@@ -47,8 +50,18 @@ export default function SessionForm({ studentId, initial, onSaved, onCancel }: P
 
   const attended = s.attendance === 'present' || s.attendance === 'late';
   const set = <K extends keyof SessionRecord>(k: K, v: SessionRecord[K]) => setS((x) => ({ ...x, [k]: v }));
-  const setMem = (patch: Partial<NonNullable<SessionRecord['memorization']>>) => setS((x) => ({ ...x, memorization: { ...x.memorization!, ...patch } }));
-  const setRev = (patch: Partial<NonNullable<SessionRecord['revision']>>) => setS((x) => ({ ...x, revision: { ...x.revision!, ...patch } }));
+  const setMem = (patch: Partial<MemorizationEntry>) =>
+    setS((x) => {
+      const next = { ...x.memorization!, ...patch };
+      next.completion = completionPercent(next.requiredPages, next.completedPages);
+      return { ...x, memorization: next };
+    });
+  const setRev = (patch: Partial<RevisionEntry>) =>
+    setS((x) => {
+      const next = { ...x.revision!, ...patch };
+      next.completion = completionPercent(next.requiredPages, next.completedPages);
+      return { ...x, revision: next };
+    });
 
   /** علامة أسبوع العبادات (سبت-خميس) المرتبط بتاريخ هذا اليوم، لاستخدامها في الاحتساب التلقائي */
   const weekWorship = useMemo(() => {
@@ -135,12 +148,24 @@ export default function SessionForm({ studentId, initial, onSaved, onCancel }: P
                 <Field label="ما تم تسميعه" className="sm:col-span-2">
                   <input className="input" value={s.memorization?.recited} onChange={(e) => setMem({ recited: e.target.value })} placeholder="الآيات 100 إلى 113" />
                 </Field>
-                <Field label="نسبة الإنجاز %">
-                  <NumberInput value={s.memorization?.completion} onChange={(v) => setMem({ completion: v ?? 0 })} />
+                <Field label="عدد الصفحات المطلوبة">
+                  <NumberInput max={999} value={s.memorization?.requiredPages} onChange={(v) => setMem({ requiredPages: v ?? 0 })} />
+                </Field>
+                <Field label="عدد الصفحات المنجزة">
+                  <NumberInput max={999} value={s.memorization?.completedPages} onChange={(v) => setMem({ completedPages: v ?? 0 })} />
                 </Field>
                 <Field label="تقييم التسميع /100">
                   <NumberInput value={s.memorization?.grade} onChange={(v) => setMem({ grade: v ?? 0 })} />
                 </Field>
+                <Field label="نسبة الإنجاز (محسوبة تلقائيًا)">
+                  <div className="flex items-center gap-2 pt-1.5">
+                    <ProgressBar value={s.memorization?.completion ?? 0} thin />
+                    <b className="w-11 shrink-0 text-[13px] text-navy-800">{pct(s.memorization?.completion ?? 0)}</b>
+                  </div>
+                </Field>
+                <div className="sm:col-span-2">
+                  <CompletionBadge status={completionStatus(s.memorization?.completion ?? 0)} />
+                </div>
                 <Field label="ملاحظات" className="sm:col-span-2">
                   <input className="input" value={s.memorization?.notes ?? ''} onChange={(e) => setMem({ notes: e.target.value })} />
                 </Field>
@@ -162,12 +187,24 @@ export default function SessionForm({ studentId, initial, onSaved, onCancel }: P
                 <Field label="ما تمت مراجعته" className="sm:col-span-2">
                   <input className="input" value={s.revision?.revised} onChange={(e) => setRev({ revised: e.target.value })} />
                 </Field>
-                <Field label="نسبة الإنجاز %">
-                  <NumberInput value={s.revision?.completion} onChange={(v) => setRev({ completion: v ?? 0 })} />
+                <Field label="عدد الصفحات المطلوبة">
+                  <NumberInput max={999} value={s.revision?.requiredPages} onChange={(v) => setRev({ requiredPages: v ?? 0 })} />
+                </Field>
+                <Field label="عدد الصفحات المنجزة">
+                  <NumberInput max={999} value={s.revision?.completedPages} onChange={(v) => setRev({ completedPages: v ?? 0 })} />
                 </Field>
                 <Field label="العلامة /100">
                   <NumberInput value={s.revision?.grade} onChange={(v) => setRev({ grade: v ?? 0 })} />
                 </Field>
+                <Field label="نسبة الإنجاز (محسوبة تلقائيًا)">
+                  <div className="flex items-center gap-2 pt-1.5">
+                    <ProgressBar value={s.revision?.completion ?? 0} thin tone="burgundy" />
+                    <b className="w-11 shrink-0 text-[13px] text-navy-800">{pct(s.revision?.completion ?? 0)}</b>
+                  </div>
+                </Field>
+                <div className="sm:col-span-2">
+                  <CompletionBadge status={completionStatus(s.revision?.completion ?? 0)} />
+                </div>
                 <Field label="الملاحظات" className="sm:col-span-2">
                   <input className="input" value={s.revision?.notes ?? ''} onChange={(e) => setRev({ notes: e.target.value })} />
                 </Field>

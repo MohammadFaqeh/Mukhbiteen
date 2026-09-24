@@ -2,8 +2,9 @@ import type { ReactNode } from 'react';
 import { BookOpen, CalendarDays, MessageSquareText, RotateCcw } from 'lucide-react';
 import type { SessionRecord } from '@/types';
 import Modal from '@/components/ui/Modal';
-import { AttendanceBadge, CommitmentBadge } from '@/components/ui/Badge';
+import { AttendanceBadge, CommitmentBadge, CompletionBadge } from '@/components/ui/Badge';
 import { ProgressBar } from '@/components/ui/Progress';
+import { completionStatus } from '@/utils/quran';
 import { formatLongDate } from '@/utils/format';
 
 function Block({ icon: Icon, title, children }: { icon: typeof BookOpen; title: string; children: ReactNode }) {
@@ -70,10 +71,14 @@ export default function SessionDetail({ session, onClose, studentName }: { sessi
                   <>
                     <KV k="الحفظ المطلوب" v={s.memorization.required} />
                     <KV k="تم التسميع" v={s.memorization.recited} />
+                    <KV k="عدد الصفحات (مطلوب/منجز)" v={`${s.memorization.requiredPages} / ${s.memorization.completedPages}`} />
                     <KV k="تقييم التسميع" v={`${s.memorization.grade}/100`} />
                     <div className="mt-2 flex items-center gap-2 text-[12px] text-navy-400">
                       <ProgressBar value={s.memorization.completion} thin />
                       {s.memorization.completion}%
+                    </div>
+                    <div className="mt-2">
+                      <CompletionBadge status={completionStatus(s.memorization.completion)} />
                     </div>
                   </>
                 ) : (
@@ -85,10 +90,14 @@ export default function SessionDetail({ session, onClose, studentName }: { sessi
                   <>
                     <KV k="المراجعة" v={s.revision.required} />
                     <KV k="ما تمت مراجعته" v={s.revision.revised} />
+                    <KV k="عدد الصفحات (مطلوب/منجز)" v={`${s.revision.requiredPages} / ${s.revision.completedPages}`} />
                     <KV k="العلامة" v={`${s.revision.grade}/100`} />
                     <div className="mt-2 flex items-center gap-2 text-[12px] text-navy-400">
                       <ProgressBar value={s.revision.completion} thin tone="burgundy" />
                       {s.revision.completion}%
+                    </div>
+                    <div className="mt-2">
+                      <CompletionBadge status={completionStatus(s.revision.completion)} />
                     </div>
                   </>
                 ) : (

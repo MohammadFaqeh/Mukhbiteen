@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
-import type { AttendanceStatus, CommitmentLevel } from '@/types';
+import type { AttendanceStatus, CommitmentLevel, CompletionStatus } from '@/types';
 import { attendanceLabels, commitmentLabels, cx } from '@/utils/format';
+import { completionStatusLabels, completionStatusTone } from '@/utils/quran';
 
 type Tone = 'navy' | 'burgundy' | 'green' | 'amber' | 'gray' | 'gold';
 const tones: Record<Tone, string> = {
@@ -35,6 +36,14 @@ export function CommitmentBadge({ level, className }: { level: CommitmentLevel; 
   return (
     <Badge tone={comTone[level]} className={className}>
       {commitmentLabels[level]}
+    </Badge>
+  );
+}
+
+export function CompletionBadge({ status, className }: { status: CompletionStatus; className?: string }) {
+  return (
+    <Badge tone={completionStatusTone[status]} className={className}>
+      {completionStatusLabels[status]}
     </Badge>
   );
 }

@@ -48,21 +48,32 @@ export interface Student {
   active: boolean;
 }
 
+/**
+ * المطلوب/المنجز عدد صفحات فعلي، ونسبة الإنجاز تُحسب منهما تلقائيًا (منجز÷مطلوب×100) —
+ * لا تُكتب يدويًا. العلامة (grade) مستقلة تمامًا عن نسبة الإنجاز: قد يُنجز الطالب نصف
+ * المطلوب لكن بإتقان تام، أو يُنجز الكل بإتقان أقل.
+ */
 export interface MemorizationEntry {
-  required: string; // الحفظ المطلوب
-  recited: string; // ما تم تسميعه
-  completion: number; // نسبة الإنجاز %
-  grade: number; // تقييم التسميع /100
+  required: string; // وصف الحفظ المطلوب (نص حر)
+  recited: string; // وصف ما تم تسميعه فعليًا (نص حر)
+  requiredPages: number; // عدد صفحات الحفظ المطلوبة
+  completedPages: number; // عدد صفحات الحفظ المسمَّعة فعليًا
+  completion: number; // نسبة الإنجاز % = completedPages ÷ requiredPages × 100 (محسوبة، غير مُدخلة يدويًا)
+  grade: number; // جودة التسميع /100 (مستقلة عن نسبة الإنجاز)
   notes?: string;
 }
 
 export interface RevisionEntry {
   required: string;
   revised: string;
+  requiredPages: number;
+  completedPages: number;
   completion: number;
   grade: number;
   notes?: string;
 }
+
+export type CompletionStatus = 'completed' | 'partial' | 'not_done';
 
 export interface SessionRecord {
   id: string;

@@ -10,7 +10,8 @@ import type { AttendanceStatus, CommitmentLevel, DailyWorship, SessionRecord } f
 import { TODAY } from '@/utils/today';
 import { suggestScore } from '@/utils/stats';
 import { weekDates, weekStartOf, weekWorshipScore } from '@/utils/worship';
-import { cx, formatLongDate } from '@/utils/format';
+import { completionPercent } from '@/utils/quran';
+import { cx, formatLongDate, pct } from '@/utils/format';
 
 interface Row {
   studentId: string;
@@ -19,10 +20,12 @@ interface Row {
   score?: number;
   hasMem: boolean;
   memGrade?: number;
-  memCompletion?: number;
+  memRequiredPages: number;
+  memCompletedPages: number;
   hasRev: boolean;
   revGrade?: number;
-  revCompletion?: number;
+  revRequiredPages: number;
+  revCompletedPages: number;
   notes: string;
   showNotes: boolean;
 }
@@ -84,10 +87,12 @@ export default function AdminAttendance() {
           score: ex?.score,
           hasMem: ex ? !!ex.memorization : true,
           memGrade: ex?.memorization?.grade ?? 90,
-          memCompletion: ex?.memorization?.completion ?? 100,
+          memRequiredPages: ex?.memorization?.requiredPages ?? 0,
+          memCompletedPages: ex?.memorization?.completedPages ?? 0,
           hasRev: ex ? !!ex.revision : true,
           revGrade: ex?.revision?.grade ?? 90,
-          revCompletion: ex?.revision?.completion ?? 100,
+          revRequiredPages: ex?.revision?.requiredPages ?? 0,
+          revCompletedPages: ex?.revision?.completedPages ?? 0,
           notes: ex?.notes ?? '',
           showNotes: !!ex?.notes,
         };
@@ -140,9 +145,25 @@ export default function AdminAttendance() {
         commitment: x.commitment,
         score: x.score ?? suggestScore({ attendance: x.attendance, memGrade: x.memGrade, revGrade: x.revGrade, weekWorship: weekWorshipByStudent.get(x.studentId) }),
         memorization: x.hasMem
-          ? { required: prev?.memorization?.required ?? req?.memorization ?? '', recited: prev?.memorization?.recited ?? '', completion: x.memCompletion ?? 0, grade: x.memGrade ?? 0 }
+          ? {
+              required: prev?.memorization?.required ?? req?.memorization ?? '',
+              recited: prev?.memorization?.recited ?? '',
+              requiredPages: x.memRequiredPages,
+              completedPages: x.memCompletedPages,
+              completion: completionPercent(x.memRequiredPages, x.memCompletedPages),
+              grade: x.memGrade ?? 0,
+            }
           : null,
-        revision: x.hasRev ? { required: prev?.revision?.required ?? req?.revision ?? '', revised: prev?.revision?.revised ?? '', completion: x.revCompletion ?? 0, grade: x.revGrade ?? 0 } : null,
+        revision: x.hasRev
+          ? {
+              required: prev?.revision?.required ?? req?.revision ?? '',
+              revised: prev?.revision?.revised ?? '',
+              requiredPages: x.revRequiredPages,
+              completedPages: x.revCompletedPages,
+              completion: completionPercent(x.revRequiredPages, x.revCompletedPages),
+              grade: x.revGrade ?? 0,
+            }
+          : null,
         notes: x.notes || undefined,
       };
     });
@@ -189,13 +210,13 @@ export default function AdminAttendance() {
 
       <section className="card overflow-hidden">
         {/* رأس الأعمدة للشاشات العريضة */}
-        <div className="hidden grid-cols-[200px_240px_110px_76px_150px_150px_100px_40px] items-center gap-3 border-b border-navy-50 bg-navy-50/60 px-4 py-2.5 text-[12px] font-medium text-navy-500 2xl:grid">
+        <div className="hidden grid-cols-[200px_240px_110px_76px_210px_210px_100px_40px] items-center gap-3 border-b border-navy-50 bg-navy-50/60 px-4 py-2.5 text-[12px] font-medium text-navy-500 2xl:grid">
           <span>الطالب</span>
           <span>الحضور</span>
           <span>الالتزام</span>
           <span>العلامة</span>
-          <span>الحفظ (علامة / إنجاز)</span>
-          <span>المراجعة (علامة / إنجاز)</span>
+          <span>الحفظ (علامة / مطلوب / منجز)</span>
+          <span>المراجعة (علامة / مطلوب / منجز)</span>
           <span>علامة أسبوع العبادات</span>
           <span />
         </div>
@@ -205,7 +226,7 @@ export default function AdminAttendance() {
             const attended = r.attendance === 'present' || r.attendance === 'late';
             return (
               <li key={r.studentId} className={cx('px-4 py-3 transition', !attended && 'bg-paper/60')}>
-                <div className="grid grid-cols-2 items-end gap-3 md:grid-cols-4 2xl:grid-cols-[200px_240px_110px_76px_150px_150px_100px_40px] 2xl:items-center">
+                <div className="grid grid-cols-2 items-end gap-3 md:grid-cols-4 2xl:grid-cols-[200px_240px_110px_76px_210px_210px_100px_40px] 2xl:items-center">
                   <div className="col-span-2 flex items-center gap-3 md:col-span-4 2xl:col-span-1">
                     <Avatar name={st.name} src={st.photo} size={40} />
                     <span className="truncate text-[14px] font-bold text-navy-900">{st.name}</span>
@@ -223,22 +244,26 @@ export default function AdminAttendance() {
                       <NumberInput small value={attended ? r.score : undefined} onChange={(v) => patch(r.studentId, { score: v })} placeholder="تلقائي" ariaLabel="علامة اليوم" />
                     </div>
                   </Cell>
-                  <Cell label="الحفظ (علامة / إنجاز)" className={cx(!attended && 'pointer-events-none opacity-40')}>
+                  <Cell label="الحفظ (علامة / مطلوب / منجز)" className={cx(!attended && 'pointer-events-none opacity-40')}>
                     <div className="flex items-center gap-1">
                       <button type="button" onClick={() => patch(r.studentId, { hasMem: !r.hasMem })} className={cx('h-7 w-7 shrink-0 rounded-lg border text-[11px]', r.hasMem ? 'border-navy-700 bg-navy-700 text-white' : 'border-navy-100 text-navy-300')} aria-label="يوجد حفظ">
                         <Check className="mx-auto h-3.5 w-3.5" />
                       </button>
-                      <NumberInput small value={r.hasMem ? r.memGrade : undefined} onChange={(v) => patch(r.studentId, { memGrade: v })} ariaLabel="علامة الحفظ" />
-                      <NumberInput small value={r.hasMem ? r.memCompletion : undefined} onChange={(v) => patch(r.studentId, { memCompletion: v })} ariaLabel="إنجاز الحفظ" placeholder="%" />
+                      <NumberInput small value={r.hasMem ? r.memGrade : undefined} onChange={(v) => patch(r.studentId, { memGrade: v })} ariaLabel="علامة الحفظ" placeholder="علامة" />
+                      <NumberInput small max={999} value={r.hasMem ? r.memRequiredPages : undefined} onChange={(v) => patch(r.studentId, { memRequiredPages: v ?? 0 })} ariaLabel="صفحات الحفظ المطلوبة" placeholder="مطلوب" />
+                      <NumberInput small max={999} value={r.hasMem ? r.memCompletedPages : undefined} onChange={(v) => patch(r.studentId, { memCompletedPages: v ?? 0 })} ariaLabel="صفحات الحفظ المنجزة" placeholder="منجز" />
+                      {r.hasMem && <span className="w-9 shrink-0 text-[11px] font-bold text-navy-500">{pct(completionPercent(r.memRequiredPages, r.memCompletedPages), 0)}</span>}
                     </div>
                   </Cell>
-                  <Cell label="المراجعة (علامة / إنجاز)" className={cx(!attended && 'pointer-events-none opacity-40')}>
+                  <Cell label="المراجعة (علامة / مطلوب / منجز)" className={cx(!attended && 'pointer-events-none opacity-40')}>
                     <div className="flex items-center gap-1">
                       <button type="button" onClick={() => patch(r.studentId, { hasRev: !r.hasRev })} className={cx('h-7 w-7 shrink-0 rounded-lg border', r.hasRev ? 'border-burgundy-600 bg-burgundy-600 text-white' : 'border-navy-100 text-navy-300')} aria-label="يوجد مراجعة">
                         <Check className="mx-auto h-3.5 w-3.5" />
                       </button>
-                      <NumberInput small value={r.hasRev ? r.revGrade : undefined} onChange={(v) => patch(r.studentId, { revGrade: v })} ariaLabel="علامة المراجعة" />
-                      <NumberInput small value={r.hasRev ? r.revCompletion : undefined} onChange={(v) => patch(r.studentId, { revCompletion: v })} ariaLabel="إنجاز المراجعة" placeholder="%" />
+                      <NumberInput small value={r.hasRev ? r.revGrade : undefined} onChange={(v) => patch(r.studentId, { revGrade: v })} ariaLabel="علامة المراجعة" placeholder="علامة" />
+                      <NumberInput small max={999} value={r.hasRev ? r.revRequiredPages : undefined} onChange={(v) => patch(r.studentId, { revRequiredPages: v ?? 0 })} ariaLabel="صفحات المراجعة المطلوبة" placeholder="مطلوب" />
+                      <NumberInput small max={999} value={r.hasRev ? r.revCompletedPages : undefined} onChange={(v) => patch(r.studentId, { revCompletedPages: v ?? 0 })} ariaLabel="صفحات المراجعة المنجزة" placeholder="منجز" />
+                      {r.hasRev && <span className="w-9 shrink-0 text-[11px] font-bold text-navy-500">{pct(completionPercent(r.revRequiredPages, r.revCompletedPages), 0)}</span>}
                     </div>
                   </Cell>
                   <Cell label="علامة أسبوع العبادات" className={cx(!attended && 'pointer-events-none opacity-40')}>
