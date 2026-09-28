@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Calculator, Check, CheckCheck, Download, FileUp, Loader2, MessageSquarePlus, Save } from 'lucide-react';
+import { Calculator, Check, CheckCheck, Download, FileUp, Loader2, MessageSquarePlus, Save, Trash2 } from 'lucide-react';
 import { useData } from '@/context/DataContext';
 import { useToast } from '@/context/ToastContext';
+import { useConfirmDelete } from '@/hooks/useConfirmDelete';
 import PageHeader from '@/components/shared/PageHeader';
 import Avatar from '@/components/ui/Avatar';
 import { AttendancePicker, CommitmentSelect, NumberInput } from '@/components/admin/fields';
@@ -55,8 +56,10 @@ function loadDraft(): { date: string; rows: Row[] } | null {
 }
 
 export default function AdminAttendance() {
-  const { students, sessions, upsertSessions, getRequirement, dailyWorship } = useData();
+  const { students, sessions, upsertSessions, deleteSessions, getRequirement, dailyWorship } = useData();
   const toast = useToast();
+  const confirmDelete = useConfirmDelete();
+  const savedForDate = sessions.filter((s) => s.date === date);
   const draft = useRef(loadDraft()).current; // يُقرأ مرة واحدة فقط عند فتح الصفحة
   const [date, setDate] = useState(draft?.date ?? TODAY);
   const [rows, setRows] = useState<Row[]>(draft?.rows ?? []);
@@ -240,6 +243,14 @@ export default function AdminAttendance() {
             <button className="btn-soft" onClick={() => setImportOpen(true)}>
               <FileUp className="h-4 w-4" /> استيراد Excel
             </button>
+            {savedForDate.length > 0 && (
+              <button
+                className="btn-ghost border-burgundy-200 text-burgundy-600 hover:bg-burgundy-50"
+                onClick={() => confirmDelete(`حذف دوام ${formatLongDate(date)} المحفوظ لكل الطلاب (${savedForDate.length} سجل)؟`, () => deleteSessions(savedForDate.map((s) => s.id)), 'تم حذف دوام هذا اليوم')}
+              >
+                <Trash2 className="h-4 w-4" /> حذف دوام اليوم
+              </button>
+            )}
           </>
         }
       />

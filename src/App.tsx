@@ -17,6 +17,7 @@ import AdminStudentDetail from './pages/admin/AdminStudentDetail';
 import AdminAttendance from './pages/admin/AdminAttendance';
 import AdminActivities from './pages/admin/AdminActivities';
 import AdminReports from './pages/admin/AdminReports';
+import AdminImport from './pages/admin/AdminImport';
 
 function RequireRole({ role, children }: { role: Role; children: ReactElement }) {
   const { user } = useAuth();
@@ -48,6 +49,7 @@ export default function App() {
         <Route path="students" element={<AdminStudents />} />
         <Route path="students/:id" element={<AdminStudentDetail />} />
         <Route path="attendance" element={<AdminAttendance />} />
+        <Route path="import" element={<AdminImport />} />
         <Route path="activities" element={<AdminActivities />} />
         <Route path="reports" element={<AdminReports />} />
       </Route>

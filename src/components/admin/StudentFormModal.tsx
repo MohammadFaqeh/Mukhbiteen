@@ -1,10 +1,11 @@
 import { useEffect, useState, type ChangeEvent } from 'react';
-import { ImagePlus, Loader2, Save } from 'lucide-react';
+import { ImagePlus, Loader2, Save, Trash2 } from 'lucide-react';
 import type { Student } from '@/types';
 import Modal from '@/components/ui/Modal';
 import Avatar from '@/components/ui/Avatar';
 import { useData } from '@/context/DataContext';
 import { useToast } from '@/context/ToastContext';
+import { useConfirmDelete } from '@/hooks/useConfirmDelete';
 import { supabase } from '@/lib/supabase';
 import { PROJECT } from '@/data/project';
 import { TODAY } from '@/utils/today';
@@ -13,8 +14,9 @@ type Draft = Omit<Student, 'id'>;
 const empty: Draft = { name: '', shortName: '', photo: '', birthDate: '', group: PROJECT.group, guardianName: '', guardianEmail: '', joinedAt: TODAY, notes: '', active: true };
 
 /** إضافة طالب جديد أو تعديل بيانات طالب موجود */
-export default function StudentFormModal({ open, onClose, student }: { open: boolean; onClose: () => void; student?: Student | null }) {
-  const { addStudent, updateStudent } = useData();
+export default function StudentFormModal({ open, onClose, student, onDeleted }: { open: boolean; onClose: () => void; student?: Student | null; onDeleted?: () => void }) {
+  const { addStudent, updateStudent, deleteStudent } = useData();
+  const confirmDelete = useConfirmDelete();
   const toast = useToast();
   const [d, setD] = useState<Draft>(empty);
   const [err, setErr] = useState('');
@@ -72,6 +74,25 @@ export default function StudentFormModal({ open, onClose, student }: { open: boo
       subtitle={student ? student.name : undefined}
       footer={
         <>
+          {student && (
+            <button
+              className="btn-ghost me-auto border-burgundy-200 text-burgundy-600 hover:bg-burgundy-50"
+              disabled={saving}
+              onClick={async () => {
+                const ok = await confirmDelete(
+                  `حذف الطالب "${student.name}" نهائيًا مع كل سجلاته (الدوام، العبادات، المطلوب القادم)؟`,
+                  () => deleteStudent(student.id),
+                  'تم حذف الطالب وكل سجلاته',
+                );
+                if (ok) {
+                  onClose();
+                  onDeleted?.();
+                }
+              }}
+            >
+              <Trash2 className="h-4 w-4" /> حذف الطالب
+            </button>
+          )}
           <button className="btn-ghost" onClick={onClose}>
             إلغاء
           </button>
@@ -87,6 +108,18 @@ export default function StudentFormModal({ open, onClose, student }: { open: boo
           {uploading ? <Loader2 className="h-10 w-10 animate-spin text-navy-300" /> : d.photo ? <Avatar name={d.name || 'طالب'} src={d.photo} size={88} rounded="2xl" /> : <ImagePlus className="h-10 w-10 text-navy-300" />}
           {uploading ? 'جارٍ الرفع...' : d.photo ? 'تغيير الصورة' : 'رفع صورة الطالب'}
           <input type="file" accept="image/*" className="sr-only" onChange={onPhoto} disabled={uploading} />
+          {d.photo && !uploading && (
+            <button
+              type="button"
+              className="text-[12px] font-medium text-burgundy-600 hover:underline"
+              onClick={(e) => {
+                e.preventDefault();
+                set('photo', '');
+              }}
+            >
+              حذف الصورة
+            </button>
+          )}
         </label>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">

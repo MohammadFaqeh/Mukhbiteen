@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Eye, LayoutGrid, List, PencilLine, Search, UserPlus } from 'lucide-react';
+import { Eye, LayoutGrid, List, PencilLine, Search, Trash2, UserPlus } from 'lucide-react';
 import { useData } from '@/context/DataContext';
+import { useConfirmDelete } from '@/hooks/useConfirmDelete';
 import PageHeader from '@/components/shared/PageHeader';
 import Select from '@/components/ui/Select';
 import Avatar from '@/components/ui/Avatar';
@@ -16,7 +17,8 @@ import { cx, pct } from '@/utils/format';
 type Sort = 'avg' | 'name' | 'attendance';
 
 export default function AdminStudents() {
-  const { students, sessions, dailyWorship } = useData();
+  const { students, sessions, dailyWorship, deleteStudent } = useData();
+  const confirmDelete = useConfirmDelete();
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState<'all' | CommitmentLevel>('all');
   const [sort, setSort] = useState<Sort>('avg');
@@ -140,6 +142,13 @@ export default function AdminStudents() {
                           </Link>
                           <button onClick={() => setModal({ open: true, student: s })} className="btn-ghost px-3 py-1.5 text-[12px]">
                             <PencilLine className="h-3.5 w-3.5" /> تعديل
+                          </button>
+                          <button
+                            onClick={() => confirmDelete(`حذف الطالب "${s.name}" نهائيًا مع كل سجلاته (الدوام، العبادات، المطلوب القادم)؟`, () => deleteStudent(s.id), 'تم حذف الطالب وكل سجلاته')}
+                            className="rounded-xl p-2 text-burgundy-500 hover:bg-burgundy-50"
+                            aria-label={`حذف ${s.name}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
                       </td>

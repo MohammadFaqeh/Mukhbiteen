@@ -1,5 +1,5 @@
 import { Outlet, useNavigate } from 'react-router-dom';
-import { CalendarPlus, FileText, GalleryHorizontalEnd, LayoutDashboard, Users } from 'lucide-react';
+import { CalendarPlus, FileSpreadsheet, FileText, GalleryHorizontalEnd, LayoutDashboard, Users } from 'lucide-react';
 import Sidebar, { type NavItem } from './Sidebar';
 import BrandBackground from '@/components/brand/BrandBackground';
 import Footer from '@/components/brand/Footer';
@@ -15,6 +15,7 @@ const items: NavItem[] = [
   { to: '/admin', label: 'لوحة التحكم', icon: LayoutDashboard, end: true },
   { to: '/admin/students', label: 'إدارة الطلاب', icon: Users },
   { to: '/admin/attendance', label: 'تسجيل دوام اليوم', icon: CalendarPlus },
+  { to: '/admin/import', label: 'استيراد سجل التسميع', icon: FileSpreadsheet },
   { to: '/admin/activities', label: 'الصور والأنشطة', icon: GalleryHorizontalEnd },
   { to: '/admin/reports', label: 'التقارير', icon: FileText },
 ];

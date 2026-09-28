@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowRight, BookOpen, CalendarCheck, CalendarPlus, HandHeart, Loader2, PencilLine, RotateCcw, Save, Trash2, TrendingUp, Trophy } from 'lucide-react';
 import { useData } from '@/context/DataContext';
 import { useToast } from '@/context/ToastContext';
+import { useConfirmDelete } from '@/hooks/useConfirmDelete';
 import type { DailyWorship, SessionRecord } from '@/types';
 import { ArchPortrait } from '@/components/parent/StudentHero';
 import StatCard from '@/components/ui/StatCard';
@@ -43,6 +44,7 @@ export default function AdminStudentDetail() {
   const sessions = useMemo(() => studentSessions(all, id), [all, id]);
   const stats = useMemo(() => studentStats(all, dailyWorship, id), [all, dailyWorship, id]);
   const [editStudent, setEditStudent] = useState(false);
+  const navigate = useNavigate();
 
   if (!student)
     return (
@@ -113,7 +115,7 @@ export default function AdminStudentDetail() {
         {tab === 'reports' && <ReportsPanel studentName={student.name} dense />}
       </div>
 
-      <StudentFormModal open={editStudent} student={student} onClose={() => setEditStudent(false)} />
+      <StudentFormModal open={editStudent} student={student} onClose={() => setEditStudent(false)} onDeleted={() => navigate('/admin/students', { replace: true })} />
     </div>
   );
 }
@@ -155,11 +157,25 @@ function Overview({ sessions, stats, name }: { sessions: SessionRecord[]; stats:
 
 /* ---------------- الدوام ---------------- */
 function SessionsTab({ studentId, sessions, name }: { studentId: string; sessions: SessionRecord[]; name: string }) {
-  const { deleteSession } = useData();
-  const toast = useToast();
+  const { deleteSession, deleteSessions } = useData();
+  const confirmDelete = useConfirmDelete();
   const [editing, setEditing] = useState<SessionRecord | null>(null);
   const [adding, setAdding] = useState(false);
   const [view, setView] = useState<SessionRecord | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const allSelected = sessions.length > 0 && sessions.every((s) => selected.has(s.id));
+  const toggle = (id: string) =>
+    setSelected((x) => {
+      const n = new Set(x);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  const deleteSelected = async () => {
+    const ids = sessions.filter((s) => selected.has(s.id)).map((s) => s.id);
+    const q = ids.length === sessions.length ? `حذف كل سجل دوام ${name} (${ids.length} يوم)؟` : `حذف ${ids.length} يوم من سجل ${name}؟`;
+    if (await confirmDelete(q, () => deleteSessions(ids), `تم حذف ${ids.length} يوم`)) setSelected(new Set());
+  };
 
   return (
     <div className="space-y-4">
@@ -170,12 +186,34 @@ function SessionsTab({ studentId, sessions, name }: { studentId: string; session
           <CalendarPlus className="h-5 w-5" /> إضافة دوام جديد
         </button>
       )}
+      {selected.size > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-burgundy-100 bg-burgundy-50/60 px-4 py-2.5">
+          <span className="text-[13px] font-medium text-burgundy-700">تم تحديد {selected.size} يوم</span>
+          <div className="flex gap-2">
+            <button className="btn-ghost px-3 py-1.5 text-[12px]" onClick={() => setSelected(new Set())}>
+              إلغاء التحديد
+            </button>
+            <button className="btn-accent px-3 py-1.5 text-[12px]" onClick={deleteSelected}>
+              <Trash2 className="h-3.5 w-3.5" /> حذف المحدد
+            </button>
+          </div>
+        </div>
+      )}
       <section className="card overflow-hidden">
         <div className="scrollbar-thin overflow-x-auto">
           <table className="w-full min-w-[760px] text-[13px]">
             <thead className="bg-navy-50/60 text-right text-[12px] text-navy-500">
               <tr>
-                <th className="px-5 py-3 font-medium">التاريخ</th>
+                <th className="w-10 py-3 pr-5">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-burgundy-600"
+                    checked={allSelected}
+                    onChange={() => setSelected(allSelected ? new Set() : new Set(sessions.map((s) => s.id)))}
+                    aria-label="تحديد الكل"
+                  />
+                </th>
+                <th className="px-3 py-3 font-medium">التاريخ</th>
                 <th className="px-3 py-3 font-medium">الحضور</th>
                 <th className="px-3 py-3 font-medium">الالتزام</th>
                 <th className="px-3 py-3 font-medium">العلامة</th>
@@ -186,8 +224,11 @@ function SessionsTab({ studentId, sessions, name }: { studentId: string; session
             </thead>
             <tbody>
               {sessions.map((s) => (
-                <tr key={s.id} className="border-t border-navy-50 hover:bg-navy-50/30">
-                  <td className="px-5 py-2.5">
+                <tr key={s.id} className={cx('border-t border-navy-50 hover:bg-navy-50/30', selected.has(s.id) && 'bg-burgundy-50/40')}>
+                  <td className="py-2.5 pr-5">
+                    <input type="checkbox" className="h-4 w-4 accent-burgundy-600" checked={selected.has(s.id)} onChange={() => toggle(s.id)} aria-label="تحديد" />
+                  </td>
+                  <td className="px-3 py-2.5">
                     <button onClick={() => setView(s)} className="font-medium text-navy-800 hover:text-burgundy-600">
                       {formatLongDate(s.date)}
                     </button>
@@ -205,15 +246,7 @@ function SessionsTab({ studentId, sessions, name }: { studentId: string; session
                         <PencilLine className="h-4 w-4" />
                       </button>
                       <button
-                        onClick={async () => {
-                          if (!confirm('حذف هذا اليوم من سجل الطالب؟')) return;
-                          try {
-                            await deleteSession(s.id);
-                            toast('تم حذف يوم الدوام');
-                          } catch (e) {
-                            toast(e instanceof Error ? e.message : 'حدث خطأ أثناء الحذف.');
-                          }
-                        }}
+                        onClick={() => confirmDelete(`حذف دوام ${formatLongDate(s.date)} من سجل الطالب؟`, () => deleteSession(s.id), 'تم حذف يوم الدوام')}
                         className="rounded-lg p-1.5 text-burgundy-500 hover:bg-burgundy-50"
                         aria-label="حذف"
                       >
@@ -237,7 +270,10 @@ function SessionsTab({ studentId, sessions, name }: { studentId: string; session
 
 /* ---------------- الحفظ / المراجعة ---------------- */
 function QuranTab({ kind, studentId, sessions }: { kind: 'mem' | 'rev'; studentId: string; sessions: SessionRecord[] }) {
+  const { upsertSessions } = useData();
+  const confirmDelete = useConfirmDelete();
   const [editing, setEditing] = useState<SessionRecord | null>(null);
+  const label = kind === 'mem' ? 'الحفظ' : 'المراجعة';
   const rows = sessions.filter((s) => (kind === 'mem' ? s.memorization : s.revision));
   const avgGrade = rows.length ? rows.reduce((a, s) => a + (kind === 'mem' ? s.memorization!.grade : s.revision!.grade), 0) / rows.length : 0;
   const avgComp = rows.length ? rows.reduce((a, s) => a + (kind === 'mem' ? s.memorization!.completion : s.revision!.completion), 0) / rows.length : 0;
@@ -277,10 +313,25 @@ function QuranTab({ kind, studentId, sessions }: { kind: 'mem' | 'rev'; studentI
                       </div>
                     </td>
                     <td className="px-3 py-2.5 font-bold text-navy-900">{e.grade}</td>
-                    <td className="px-5 py-2.5 text-left">
-                      <button onClick={() => setEditing(s)} className="rounded-lg p-1.5 text-navy-500 hover:bg-navy-50" aria-label="تعديل">
-                        <PencilLine className="h-4 w-4" />
-                      </button>
+                    <td className="px-5 py-2.5">
+                      <div className="flex justify-end gap-1">
+                        <button onClick={() => setEditing(s)} className="rounded-lg p-1.5 text-navy-500 hover:bg-navy-50" aria-label="تعديل">
+                          <PencilLine className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() =>
+                            confirmDelete(
+                              `حذف ${label} من دوام ${formatLongDate(s.date)}؟ (يبقى يوم الدوام نفسه)`,
+                              () => upsertSessions([{ ...s, [kind === 'mem' ? 'memorization' : 'revision']: null }]),
+                              `تم حذف ${label} من هذا اليوم`,
+                            )
+                          }
+                          className="rounded-lg p-1.5 text-burgundy-500 hover:bg-burgundy-50"
+                          aria-label={`حذف ${label}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -298,8 +349,9 @@ function QuranTab({ kind, studentId, sessions }: { kind: 'mem' | 'rev'; studentI
 
 /* ---------------- العبادات ---------------- */
 function WorshipTab({ studentId }: { studentId: string }) {
-  const { dailyWorship, upsertDailyWorship } = useData();
+  const { dailyWorship, upsertDailyWorship, deleteDailyWorship } = useData();
   const toast = useToast();
+  const confirmDelete = useConfirmDelete();
   const mine = useMemo(() => dailyWorship.filter((d) => d.studentId === studentId), [dailyWorship, studentId]);
 
   const weeks = useMemo(() => {
@@ -322,6 +374,7 @@ function WorshipTab({ studentId }: { studentId: string }) {
 
   const patch = (date: string, p: Partial<DailyWorship>) => setDraft((d) => ({ ...d, [date]: { ...d[date], ...p } }));
   const score = weekWorshipScore(Object.values(draft));
+  const savedThisWeek = mine.filter((d) => dates.includes(d.date));
 
   const months = useMemo(() => [...new Set(mine.map((d) => d.date.slice(0, 7)))].sort().reverse(), [mine]);
 
@@ -369,7 +422,19 @@ function WorshipTab({ studentId }: { studentId: string }) {
         </div>
       </section>
 
-      <div className="flex justify-end">
+      <div className="flex flex-wrap justify-end gap-2">
+        {savedThisWeek.length > 0 && (
+          <button
+            className="btn-ghost border-burgundy-200 text-burgundy-600 hover:bg-burgundy-50"
+            disabled={saving}
+            onClick={async () => {
+              const ok = await confirmDelete(`حذف جدول عبادات أسبوع ${formatDate(weekStart)} (${savedThisWeek.length} يوم محفوظ)؟`, () => deleteDailyWorship(savedThisWeek.map((d) => d.id)), 'تم حذف جدول الأسبوع');
+              if (ok) setDraft(Object.fromEntries(dates.map((date) => [date, emptyDailyWorship(studentId, date)])));
+            }}
+          >
+            <Trash2 className="h-4 w-4" /> حذف جدول الأسبوع
+          </button>
+        )}
         <button className="btn-accent px-8" onClick={save} disabled={saving}>
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} حفظ جدول الأسبوع
         </button>

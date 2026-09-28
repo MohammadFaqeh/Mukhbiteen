@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CalendarPlus, GalleryHorizontalEnd, TrendingUp, UserCheck, UserPlus, Users, CalendarCheck } from 'lucide-react';
+import { CalendarPlus, FileSpreadsheet, GalleryHorizontalEnd, TrendingUp, UserCheck, UserPlus, Users, CalendarCheck } from 'lucide-react';
 import { useData } from '@/context/DataContext';
 import StatCard from '@/components/ui/StatCard';
 import ScoreChart from '@/components/ui/ScoreChart';
@@ -76,6 +76,7 @@ export default function AdminDashboard() {
         <section className="grid gap-3 xl:col-span-3">
           {[
             { to: '/admin/attendance', icon: CalendarPlus, t: 'تسجيل دوام اليوم', d: 'إدخال حضور وعلامات الجميع', c: 'bg-navy-800 text-white' },
+            { to: '/admin/import', icon: FileSpreadsheet, t: 'استيراد سجل التسميع', d: 'رفع شيت التسميع الأسبوعي', c: 'bg-white text-navy-800' },
             { action: () => setAdding(true), icon: UserPlus, t: 'إضافة طالب', d: 'طالب جديد في المجموعة', c: 'bg-white text-navy-800' },
             { to: '/admin/activities', icon: GalleryHorizontalEnd, t: 'الصور والأنشطة', d: 'إدارة صور السلايد شو', c: 'bg-white text-navy-800' },
           ].map((q) => {

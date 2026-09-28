@@ -1,18 +1,21 @@
 import { useEffect, useState } from 'react';
-import { Save } from 'lucide-react';
+import { Save, Trash2 } from 'lucide-react';
 import type { NextRequirement } from '@/types';
 import NextSessionTicket from '@/components/parent/NextSessionTicket';
 import { Field } from './fields';
 import { useData } from '@/context/DataContext';
 import { useToast } from '@/context/ToastContext';
+import { useConfirmDelete } from '@/hooks/useConfirmDelete';
 import { TODAY } from '@/utils/today';
 
 /** تحديد المطلوب للدوام القادم مع معاينة مباشرة لما سيراه ولي الأمر */
 export default function NextRequirementForm({ studentId }: { studentId: string }) {
-  const { getRequirement, saveRequirement } = useData();
+  const { getRequirement, saveRequirement, deleteRequirement } = useData();
   const toast = useToast();
+  const confirmDelete = useConfirmDelete();
   const current = getRequirement(studentId);
-  const [r, setR] = useState<NextRequirement>(current ?? { studentId, date: '', memorization: '', revision: '', extraTask: '', notes: '', updatedAt: TODAY });
+  const blank: NextRequirement = { studentId, date: '', memorization: '', revision: '', extraTask: '', notes: '', updatedAt: TODAY };
+  const [r, setR] = useState<NextRequirement>(current ?? blank);
   useEffect(() => {
     if (current) setR(current);
   }, [current]);
@@ -51,6 +54,17 @@ export default function NextRequirementForm({ studentId }: { studentId: string }
           <Save className="h-4 w-4" />
           حفظ المطلوب
         </button>
+        {current && (
+          <button
+            className="btn-ghost w-full border-burgundy-200 text-burgundy-600 hover:bg-burgundy-50"
+            onClick={async () => {
+              if (await confirmDelete('حذف المطلوب للدوام القادم؟ لن يظهر لولي الأمر بعدها.', () => deleteRequirement(studentId), 'تم حذف المطلوب')) setR(blank);
+            }}
+          >
+            <Trash2 className="h-4 w-4" />
+            حذف المطلوب
+          </button>
+        )}
       </section>
       <div className="xl:col-span-7">
         <p className="mb-2 text-[12px] text-navy-400">معاينة ما سيظهر لولي الأمر</p>

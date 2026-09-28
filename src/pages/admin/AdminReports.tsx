@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
-import { Award, Loader2, Medal, Trophy } from 'lucide-react';
+import { Award, Loader2, Medal, Trash2, Trophy } from 'lucide-react';
 import { useData } from '@/context/DataContext';
 import { useToast } from '@/context/ToastContext';
+import { useConfirmDelete } from '@/hooks/useConfirmDelete';
 import PageHeader from '@/components/shared/PageHeader';
 import Select from '@/components/ui/Select';
 import Avatar from '@/components/ui/Avatar';
@@ -14,8 +15,9 @@ import { cx, formatDate, pct } from '@/utils/format';
 type Mode = 'normal' | 'honor';
 
 export default function AdminReports() {
-  const { students, sessions, dailyWorship, honorBoards, publishHonorBoard, unpublishHonorBoard } = useData();
+  const { students, sessions, dailyWorship, honorBoards, publishHonorBoard, unpublishHonorBoard, deleteHonorBoard } = useData();
   const toast = useToast();
+  const confirmDelete = useConfirmDelete();
   const [mode, setMode] = useState<Mode>('normal');
 
   const presets = useMemo(() => periodPresets(sessions), [sessions]);
@@ -208,6 +210,32 @@ export default function AdminReports() {
               </button>
             </div>
           </section>
+
+          {honorBoards.length > 0 && (
+            <section className="card overflow-hidden">
+              <h3 className="section-title border-b border-navy-50 px-5 py-4">لوحات الشرف السابقة</h3>
+              <ul className="divide-y divide-navy-50">
+                {honorBoards.map((h) => (
+                  <li key={h.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13px] font-bold text-navy-800">{h.title}</p>
+                      <p className="text-[12px] text-navy-400">
+                        {formatDate(h.periodFrom)} – {formatDate(h.periodTo)} · {h.entries.length} طالبًا
+                      </p>
+                    </div>
+                    {h.published && <span className="rounded-full bg-emerald-50 px-3 py-1 text-[12px] font-medium text-emerald-700">منشورة</span>}
+                    <button
+                      className="rounded-lg p-1.5 text-burgundy-500 hover:bg-burgundy-50"
+                      aria-label="حذف لوحة الشرف"
+                      onClick={() => confirmDelete(`حذف لوحة الشرف "${h.title}"${h.published ? ' (منشورة حاليًا وستختفي عن أولياء الأمور)' : ''}؟`, () => deleteHonorBoard(h.id), 'تم حذف لوحة الشرف')}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
         </div>
       )}
     </div>
