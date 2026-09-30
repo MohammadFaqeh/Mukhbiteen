@@ -8,13 +8,15 @@ import Select from '@/components/ui/Select';
 import { monthKey } from '@/utils/stats';
 import { dailyWorshipScore, weekDates, weekStartOf, weekWorshipScore } from '@/utils/worship';
 import { formatDate, formatMonthKey, pct } from '@/utils/format';
+import { TODAY } from '@/utils/today';
 
 export default function ParentWorship() {
   const { student, worship, stats } = useParentStudent();
 
-  const weeks = useMemo(() => [...new Set(worship.map((d) => weekStartOf(d.date)))].sort().reverse(), [worship]);
-  const [weekStart, setWeekStart] = useState(weeks[0] ?? '');
-  const dates = useMemo(() => weekDates(weekStart || weeks[0] || ''), [weekStart, weeks]);
+  // الأسبوع الحالي دائمًا ضمن القائمة — طالب بلا أي يوم مسجّل كان يمرّر تاريخ فاضي ويوقع الصفحة
+  const weeks = useMemo(() => [...new Set([weekStartOf(TODAY), ...worship.map((d) => weekStartOf(d.date))])].sort().reverse(), [worship]);
+  const [weekStart, setWeekStart] = useState(weekStartOf(TODAY));
+  const dates = useMemo(() => weekDates(weekStart), [weekStart]);
   const daysMap = useMemo(() => Object.fromEntries(dates.map((d) => [d, worship.find((w) => w.date === d)])), [dates, worship]);
   const weekDays = dates.map((d) => daysMap[d]).filter((d): d is NonNullable<typeof d> => !!d);
   const weekScore = weekWorshipScore(weekDays);
@@ -34,8 +36,8 @@ export default function ParentWorship() {
         title="العبادات"
         subtitle="عبّي كل يوم لحال (من السبت إلى الخميس) – يوم الجمعة هو يوم الدوام بالمركز"
         actions={
-          weeks.length > 0 && (
-            <Select value={weekStart || weeks[0]} onChange={setWeekStart} options={weeks.map((w) => ({ value: w, label: `أسبوع ${formatDate(w)}` }))} className="w-52" ariaLabel="اختيار الأسبوع" />
+          weeks.length > 1 && (
+            <Select value={weekStart} onChange={setWeekStart} options={weeks.map((w) => ({ value: w, label: `أسبوع ${formatDate(w)}` }))} className="w-52" ariaLabel="اختيار الأسبوع" />
           )
         }
       />

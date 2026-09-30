@@ -19,6 +19,7 @@ const clamp = (n: number, a: number, b: number) => Math.max(a, Math.min(b, n));
 /** بداية أسبوع العبادات (يوم السبت) الذي يقع فيه هذا التاريخ */
 export function weekStartOf(iso: string): string {
   const d = new Date(`${iso}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return ''; // تاريخ فاضي/غلط: لا نرمي خطأ يوقع الصفحة
   const shift = (d.getDay() + 1) % 7; // السبت=6→0، الأحد=0→1، ...الجمعة=5→6
   d.setDate(d.getDate() - shift);
   return d.toISOString().slice(0, 10);
@@ -28,6 +29,7 @@ export function weekStartOf(iso: string): string {
 export function weekDates(weekStart: string): string[] {
   const out: string[] = [];
   const d = new Date(`${weekStart}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return out;
   for (let i = 0; i < 6; i++) {
     out.push(d.toISOString().slice(0, 10));
     d.setDate(d.getDate() + 1);
