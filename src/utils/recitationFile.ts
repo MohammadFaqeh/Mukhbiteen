@@ -106,8 +106,9 @@ async function buildAndDownload(rows: Cell[][], fileName: string) {
         `IF(AND(OR(C${r}="غائب",C${r}="غائب بعذر"),N(E${r})+N(I${r})>0),"⚠ غائب وفيه تسميع",` +
         `IF(AND(OR(N(E${r})>0,F${r}<>""),G${r}=""),"⚠ جودة الحفظ ناقصة",` +
         `IF(AND(OR(N(I${r})>0,J${r}<>""),K${r}=""),"⚠ جودة المراجعة ناقصة",` +
+        `IF(OR(C${r}="غائب",C${r}="غائب بعذر"),"غائب — باقي الصف ما بينحسب",` +
         `IF(COUNTIFS(A$3:A$${last},A${r},B$3:B$${last},B${r})>1,"⚠ الطالب مكرر بنفس التاريخ",` +
-        `IF(AND(OR(C${r}="حاضر",C${r}="متأخر"),N(E${r})+N(I${r})=0,F${r}="",J${r}=""),"⚠ حاضر وما سمّع شي؟","✓"))))))))`,
+        `IF(AND(OR(C${r}="حاضر",C${r}="متأخر"),N(E${r})+N(I${r})=0,F${r}="",J${r}=""),"⚠ حاضر وما سمّع شي؟","✓")))))))))`,
     };
     q.font = { color: { argb: 'FF8A6D1F' } };
   }
@@ -125,6 +126,8 @@ async function buildAndDownload(rows: Cell[][], fileName: string) {
   ws.addConditionalFormatting({
     ref: `A3:Q${last}`,
     rules: [
+      // الغائب: الصف رمادي — باقي الصف ما بيتحسب، ما في داعي تمسح أرقامه
+      { type: 'expression', priority: 0, formulae: ['OR($C3="غائب",$C3="غائب بعذر")'], style: { font: { color: { argb: 'FFA0A7B4' } }, fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFF1F2F5' } } } },
       { type: 'expression', priority: 1, formulae: ['LEFT($Q3,1)="⚠"'], style: { fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFFFF4D6' } } } },
       { type: 'expression', priority: 2, formulae: ['AND($A3<>"",$A3<>$A2)'], style: { border: { top: { style: 'medium', color: { argb: NAVY } } } } },
     ],

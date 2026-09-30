@@ -116,11 +116,17 @@ const nextWeek = (iso: string) => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
-/** المطلوب القادم من آخر صف للطالب (ضمن الفترة) — الصفوف الأقدم لا تغيّر المطلوب الحالي */
-function requirementFrom(entries: LogEntry[]): Omit<NextRequirement, 'studentId'> | null {
+/**
+ * المطلوب القادم من آخر صف للطالب (ضمن الفترة) — الصفوف الأقدم لا تغيّر المطلوب الحالي.
+ * الغائب بدون مطلوب قادم مكتوب: نفس مطلوبه الحالي ينتقل للدوام اللي بعده تلقائيًا.
+ */
+function requirementFrom(entries: LogEntry[], cur: NextRequirement | undefined): Omit<NextRequirement, 'studentId'> | null {
   const last = entries.reduce<LogEntry | null>((a, e) => (!a || e.date > a.date ? e : a), null);
-  if (!last || !(last.nextMem || last.nextRev || last.nextExtra)) return null;
-  return { date: nextWeek(last.date), memorization: last.nextMem ?? '', revision: last.nextRev ?? '', extraTask: last.nextExtra ?? '', updatedAt: TODAY };
+  if (!last) return null;
+  if (last.nextMem || last.nextRev || last.nextExtra)
+    return { date: nextWeek(last.date), memorization: last.nextMem ?? '', revision: last.nextRev ?? '', extraTask: last.nextExtra ?? '', notes: cur?.notes ?? '', updatedAt: TODAY };
+  const absent = last.attendance === 'absent' || last.attendance === 'excused';
+  return absent && cur ? { ...cur, date: nextWeek(last.date), updatedAt: TODAY } : null;
 }
 
 export default function AdminImport() {
@@ -217,9 +223,9 @@ export default function AdminImport() {
       p.entries.push(e);
     });
     perName.forEach((p, name) => {
-      const req = requirementFrom(inRange.filter((e) => e.studentName === name));
       const sid = idOf.get(name)?.studentId;
       const cur = sid ? nextRequirements.find((r) => r.studentId === sid) : undefined;
+      const req = requirementFrom(inRange.filter((e) => e.studentName === name), cur);
       const unchanged = cur && cur.memorization === req?.memorization && cur.revision === req.revision && (cur.extraTask ?? '') === req.extraTask && cur.date === req.date;
       // لا نرجّع المطلوب لتاريخ أقدم من المحدد حاليًا بالموقع (مثلًا ملف قديم)
       if (req && !unchanged && !(cur && cur.date > req.date)) p.requirement = req;
@@ -263,7 +269,7 @@ export default function AdminImport() {
         });
         if (p.requirement) {
           const cur = nextRequirements.find((r) => r.studentId === sid);
-          requirements.push({ ...p.requirement, studentId: sid, notes: cur?.notes ?? '' });
+          requirements.push({ ...p.requirement, studentId: sid, notes: p.requirement.notes ?? cur?.notes ?? '' });
         }
       });
       if (records.length) await upsertSessions(records);
