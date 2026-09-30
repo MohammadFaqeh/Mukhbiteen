@@ -3,6 +3,7 @@
  * الحقول المتداخلة (memorization, revision, prayers) تُخزَّن كما هي (jsonb) بلا تحويل إضافي.
  */
 import type { Activity, DailyWorship, HonorBoard, NextRequirement, SessionRecord, Student } from '@/types';
+import { isAssigned } from '@/utils/quran';
 
 export function studentFromRow(r: any): Student {
   return {
@@ -44,8 +45,9 @@ export function sessionFromRow(r: any): SessionRecord {
     attendance: r.attendance,
     commitment: r.commitment ?? undefined,
     score: r.score ?? undefined,
-    memorization: r.memorization ?? undefined,
-    revision: r.revision ?? undefined,
+    // جزء بمطلوب 0 ومسمّع 0 (سجلات قديمة) = غير مطلوب من الطالب، فلا يظهر ولا يُحسب
+    memorization: isAssigned(r.memorization) ? r.memorization : null,
+    revision: isAssigned(r.revision) ? r.revision : null,
     notes: r.notes ?? undefined,
   };
 }

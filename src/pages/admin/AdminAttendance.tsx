@@ -1,19 +1,17 @@
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Calculator, Check, CheckCheck, Download, FileUp, Loader2, MessageSquarePlus, Save, Trash2 } from 'lucide-react';
+import { BookOpen, Calculator, Check, CheckCheck, ListPlus, Loader2, MessageSquarePlus, RotateCcw, Save, Trash2 } from 'lucide-react';
 import { useData } from '@/context/DataContext';
 import { useToast } from '@/context/ToastContext';
 import { useConfirmDelete } from '@/hooks/useConfirmDelete';
 import PageHeader from '@/components/shared/PageHeader';
 import Avatar from '@/components/ui/Avatar';
 import { AttendancePicker, CommitmentSelect, NumberInput } from '@/components/admin/fields';
-import ImportExcelModal, { type MatchedImportRow } from '@/components/admin/ImportExcelModal';
 import type { AttendanceStatus, CommitmentLevel, DailyWorship, SessionRecord } from '@/types';
 import { TODAY } from '@/utils/today';
 import { suggestScore } from '@/utils/stats';
 import { weekDates, weekStartOf, weekWorshipScore } from '@/utils/worship';
-import { completionPercent } from '@/utils/quran';
-import { downloadAttendanceTemplate } from '@/utils/excel';
+import { completionPercent, isAssigned, parsePageRanges } from '@/utils/quran';
 import { cx, formatLongDate, pct } from '@/utils/format';
 
 interface Row {
@@ -33,6 +31,14 @@ interface Row {
   revRevised?: string;
   notes: string;
   showNotes: boolean;
+  showDetails?: boolean; // سطر وصف ما سُمّع حفظًا ومراجعةً
+}
+
+/** الحفظ/المراجعة المطلوبة فعلًا بالصف — المفعّل بمطلوب 0 ومسمّع 0 وبلا وصف يُعتبر غير مطلوب (لا يُحفظ ولا يُحسب صفرًا) */
+function partsOf(x: Row) {
+  const mem = { required: '', recited: x.memRecited ?? '', requiredPages: x.memRequiredPages, completedPages: x.memCompletedPages, completion: completionPercent(x.memRequiredPages, x.memCompletedPages), grade: x.memGrade ?? 0 };
+  const rev = { required: '', revised: x.revRevised ?? '', requiredPages: x.revRequiredPages, completedPages: x.revCompletedPages, completion: completionPercent(x.revRequiredPages, x.revCompletedPages), grade: x.revGrade ?? 0 };
+  return { mem: x.hasMem && isAssigned(mem) ? mem : null, rev: x.hasRev && isAssigned(rev) ? rev : null };
 }
 
 function Cell({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
@@ -104,6 +110,7 @@ export default function AdminAttendance() {
           revRevised: ex?.revision?.revised,
           notes: ex?.notes ?? '',
           showNotes: !!ex?.notes,
+          showDetails: !!(ex?.memorization?.recited || ex?.revision?.revised),
         };
       }),
     );
@@ -121,6 +128,14 @@ export default function AdminAttendance() {
 
   const patch = (id: string, p: Partial<Row>) => setRows((r) => r.map((x) => (x.studentId === id ? { ...x, ...p } : x)));
 
+  /** توحيد كتابة أرقام الصفحات (415 - 416 ← 415-416)، وإذا المنجز فاضي يتعبّى بعدد الصفحات */
+  const fixPages = (r: Row, part: 'mem' | 'rev') => {
+    const parsed = parsePageRanges((part === 'mem' ? r.memRecited : r.revRevised) ?? '');
+    if (!parsed) return;
+    if (part === 'mem') patch(r.studentId, { memRecited: parsed.text, ...(r.memCompletedPages ? {} : { memCompletedPages: parsed.pages }) });
+    else patch(r.studentId, { revRevised: parsed.text, ...(r.revCompletedPages ? {} : { revCompletedPages: parsed.pages }) });
+  };
+
   const counts = useMemo(() => {
     const c = { present: 0, late: 0, absent: 0, excused: 0 };
     rows.forEach((r) => c[r.attendance]++);
@@ -133,41 +148,10 @@ export default function AdminAttendance() {
         ...x,
         score:
           x.attendance === 'present' || x.attendance === 'late'
-            ? suggestScore({ attendance: x.attendance, memGrade: x.hasMem ? x.memGrade : undefined, revGrade: x.hasRev ? x.revGrade : undefined, weekWorship: weekWorshipByStudent.get(x.studentId) })
+            ? suggestScore({ attendance: x.attendance, ...partsOf(x), weekWorship: weekWorshipByStudent.get(x.studentId), commitment: x.commitment })
             : undefined,
       })),
     );
-
-  const [importOpen, setImportOpen] = useState(false);
-  const applyImport = (imported: MatchedImportRow[]) => {
-    const usable = imported.filter((r) => r.studentId && !r.ignored);
-    setRows((prev) => {
-      const map = new Map(prev.map((r) => [r.studentId, r]));
-      usable.forEach((imp) => {
-        const existing = map.get(imp.studentId!);
-        if (!existing) return;
-        const memGiven = imp.memRequiredPages !== undefined || imp.memCompletedPages !== undefined;
-        const revGiven = imp.revRequiredPages !== undefined || imp.revCompletedPages !== undefined;
-        map.set(imp.studentId!, {
-          ...existing,
-          hasMem: memGiven ? true : existing.hasMem,
-          memRequiredPages: imp.memRequiredPages ?? existing.memRequiredPages,
-          memCompletedPages: imp.memCompletedPages ?? existing.memCompletedPages,
-          memGrade: imp.memGrade ?? existing.memGrade,
-          memRecited: imp.memRecited ?? existing.memRecited,
-          hasRev: revGiven ? true : existing.hasRev,
-          revRequiredPages: imp.revRequiredPages ?? existing.revRequiredPages,
-          revCompletedPages: imp.revCompletedPages ?? existing.revCompletedPages,
-          revGrade: imp.revGrade ?? existing.revGrade,
-          revRevised: imp.revRevised ?? existing.revRevised,
-          notes: imp.notes || existing.notes,
-          showNotes: !!(imp.notes || existing.notes),
-        });
-      });
-      return [...map.values()];
-    });
-    toast(`تم استيراد ${usable.length} طالبًا من الملف — راجع البيانات واضغط "حفظ الجميع" لاعتمادها نهائيًا`);
-  };
 
   const [saving, setSaving] = useState(false);
   const saveAll = async () => {
@@ -177,33 +161,16 @@ export default function AdminAttendance() {
       const prev = sessions.find((s) => s.id === id);
       const req = getRequirement(x.studentId);
       if (!attended) return { id, studentId: x.studentId, date, attendance: x.attendance, notes: x.notes || undefined };
+      const { mem, rev } = partsOf(x);
       return {
         id,
         studentId: x.studentId,
         date,
         attendance: x.attendance,
         commitment: x.commitment,
-        score: x.score ?? suggestScore({ attendance: x.attendance, memGrade: x.memGrade, revGrade: x.revGrade, weekWorship: weekWorshipByStudent.get(x.studentId) }),
-        memorization: x.hasMem
-          ? {
-              required: prev?.memorization?.required ?? req?.memorization ?? '',
-              recited: x.memRecited ?? prev?.memorization?.recited ?? '',
-              requiredPages: x.memRequiredPages,
-              completedPages: x.memCompletedPages,
-              completion: completionPercent(x.memRequiredPages, x.memCompletedPages),
-              grade: x.memGrade ?? 0,
-            }
-          : null,
-        revision: x.hasRev
-          ? {
-              required: prev?.revision?.required ?? req?.revision ?? '',
-              revised: x.revRevised ?? prev?.revision?.revised ?? '',
-              requiredPages: x.revRequiredPages,
-              completedPages: x.revCompletedPages,
-              completion: completionPercent(x.revRequiredPages, x.revCompletedPages),
-              grade: x.revGrade ?? 0,
-            }
-          : null,
+        score: x.score ?? suggestScore({ attendance: x.attendance, mem, rev, weekWorship: weekWorshipByStudent.get(x.studentId), commitment: x.commitment }),
+        memorization: mem && { ...mem, required: prev?.memorization?.required ?? req?.memorization ?? '', recited: mem.recited || prev?.memorization?.recited || '' },
+        revision: rev && { ...rev, required: prev?.revision?.required ?? req?.revision ?? '', revised: rev.revised || prev?.revision?.revised || '' },
         notes: x.notes || undefined,
       };
     });
@@ -237,12 +204,6 @@ export default function AdminAttendance() {
             <button className="btn-soft" onClick={calcAll}>
               <Calculator className="h-4 w-4" /> احتساب العلامات
             </button>
-            <button className="btn-ghost" onClick={() => downloadAttendanceTemplate(students).catch(() => toast('تعذّر إنشاء ملف القالب.'))}>
-              <Download className="h-4 w-4" /> تحميل قالب Excel
-            </button>
-            <button className="btn-soft" onClick={() => setImportOpen(true)}>
-              <FileUp className="h-4 w-4" /> استيراد Excel
-            </button>
             {savedForDate.length > 0 && (
               <button
                 className="btn-ghost border-burgundy-200 text-burgundy-600 hover:bg-burgundy-50"
@@ -264,7 +225,7 @@ export default function AdminAttendance() {
 
       <section className="card overflow-hidden">
         {/* رأس الأعمدة للشاشات العريضة */}
-        <div className="hidden grid-cols-[200px_240px_110px_76px_210px_210px_100px_40px] items-center gap-3 border-b border-navy-50 bg-navy-50/60 px-4 py-2.5 text-[12px] font-medium text-navy-500 2xl:grid">
+        <div className="hidden grid-cols-[200px_240px_110px_76px_210px_210px_100px_76px] items-center gap-3 border-b border-navy-50 bg-navy-50/60 px-4 py-2.5 text-[12px] font-medium text-navy-500 2xl:grid">
           <span>الطالب</span>
           <span>الحضور</span>
           <span>الالتزام</span>
@@ -280,7 +241,7 @@ export default function AdminAttendance() {
             const attended = r.attendance === 'present' || r.attendance === 'late';
             return (
               <li key={r.studentId} className={cx('px-4 py-3 transition', !attended && 'bg-paper/60')}>
-                <div className="grid grid-cols-2 items-end gap-3 md:grid-cols-4 2xl:grid-cols-[200px_240px_110px_76px_210px_210px_100px_40px] 2xl:items-center">
+                <div className="grid grid-cols-2 items-end gap-3 md:grid-cols-4 2xl:grid-cols-[200px_240px_110px_76px_210px_210px_100px_76px] 2xl:items-center">
                   <div className="col-span-2 flex items-center gap-3 md:col-span-4 2xl:col-span-1">
                     <Avatar name={st.name} src={st.photo} size={40} />
                     <span className="truncate text-[14px] font-bold text-navy-900">{st.name}</span>
@@ -323,12 +284,47 @@ export default function AdminAttendance() {
                   <Cell label="علامة أسبوع العبادات" className={cx(!attended && 'pointer-events-none opacity-40')}>
                     <span className="text-[13px] font-bold text-navy-700">{Math.round(weekWorshipByStudent.get(r.studentId) ?? 0)}%</span>
                   </Cell>
-                  <div className="flex justify-end">
+                  <div className="flex justify-end gap-0.5">
+                    <button
+                      onClick={() => patch(r.studentId, { showDetails: !r.showDetails })}
+                      disabled={!attended}
+                      className={cx('rounded-lg p-1.5 transition disabled:opacity-30', r.memRecited || r.revRevised ? 'text-navy-700' : 'text-navy-300 hover:text-navy-600')}
+                      aria-label="وصف الحفظ والمراجعة"
+                      title="وصف ما سُمّع حفظًا ومراجعةً"
+                    >
+                      <ListPlus className="h-5 w-5" />
+                    </button>
                     <button onClick={() => patch(r.studentId, { showNotes: !r.showNotes })} className={cx('rounded-lg p-1.5 transition', r.notes ? 'text-burgundy-600' : 'text-navy-300 hover:text-navy-600')} aria-label="ملاحظات">
                       <MessageSquarePlus className="h-5 w-5" />
                     </button>
                   </div>
                 </div>
+                {r.showDetails && attended && (
+                  <div className="mt-2 grid animate-fade-in gap-2 md:grid-cols-2">
+                    {(
+                      [
+                        { on: r.hasMem, icon: BookOpen, tone: 'bg-navy-700', label: 'الحفظ', req: getRequirement(r.studentId)?.memorization, value: r.memRecited, set: (v: string) => patch(r.studentId, { memRecited: v }), fix: () => fixPages(r, 'mem') },
+                        { on: r.hasRev, icon: RotateCcw, tone: 'bg-burgundy-600', label: 'المراجعة', req: getRequirement(r.studentId)?.revision, value: r.revRevised, set: (v: string) => patch(r.studentId, { revRevised: v }), fix: () => fixPages(r, 'rev') },
+                      ] as const
+                    ).map(({ on, icon: Icon, tone, label, req, value, set, fix }) => (
+                      <div key={label} className={cx('flex items-center gap-2', !on && 'pointer-events-none opacity-40')}>
+                        <span className={cx('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white', tone)} title={label}>
+                          <Icon className="h-4 w-4" />
+                        </span>
+                        <input
+                          className="input input-sm"
+                          placeholder={on ? `صفحات ${label} المسمّعة (مثال: 415-416)` : `لا يوجد ${label}`}
+                          value={on ? value ?? '' : ''}
+                          onChange={(e) => set(e.target.value)}
+                          onBlur={fix}
+                          inputMode="numeric"
+                          aria-label={`وصف ${label} المسمّع`}
+                        />
+                        {on && req && <span className="hidden max-w-[40%] shrink-0 truncate text-[11px] text-navy-400 lg:inline">المطلوب: {req}</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {r.showNotes && (
                   <input className="input input-sm mt-2 animate-fade-in" placeholder={`ملاحظة عن ${st.name}`} value={r.notes} onChange={(e) => patch(r.studentId, { notes: e.target.value })} />
                 )}
@@ -338,7 +334,7 @@ export default function AdminAttendance() {
         </ul>
       </section>
 
-      <p className="mt-3 text-[12px] text-navy-400">علامة أسبوع العبادات تُدخل من صفحة الطالب ← تبويب العبادات، وتدخل هنا تلقائيًا ضمن معادلة العلامة (20%).</p>
+      <p className="mt-3 text-[12px] text-navy-400">علامة أسبوع العبادات تُدخل من صفحة الطالب ← تبويب العبادات، وتدخل هنا تلقائيًا ضمن معادلة العلامة (20%). الحفظ أو المراجعة بمطلوب 0 ومسمّع 0 = غير مطلوب، ما بينحسب على الطالب.</p>
 
       <div className="sticky bottom-3 z-20 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-navy-100 bg-white/95 px-5 py-3 shadow-lift backdrop-blur">
         <span className="text-[13px] text-navy-500">
@@ -349,7 +345,6 @@ export default function AdminAttendance() {
         </button>
       </div>
 
-      <ImportExcelModal open={importOpen} onClose={() => setImportOpen(false)} students={students} onApprove={applyImport} />
     </div>
   );
 }

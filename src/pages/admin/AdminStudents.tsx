@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Eye, LayoutGrid, List, PencilLine, Search, Trash2, UserPlus } from 'lucide-react';
+import { Download, Eye, FileSpreadsheet, FileUp, LayoutGrid, List, PencilLine, Search, Trash2, UserPlus } from 'lucide-react';
 import { useData } from '@/context/DataContext';
 import { useConfirmDelete } from '@/hooks/useConfirmDelete';
 import PageHeader from '@/components/shared/PageHeader';
@@ -10,6 +10,9 @@ import { CommitmentBadge } from '@/components/ui/Badge';
 import { ProgressBar } from '@/components/ui/Progress';
 import AdminStudentCard from '@/components/admin/AdminStudentCard';
 import StudentFormModal from '@/components/admin/StudentFormModal';
+import StudentsImportModal from '@/components/admin/StudentsImportModal';
+import { useToast } from '@/context/ToastContext';
+import { downloadStudentsFile } from '@/utils/studentsExcel';
 import type { CommitmentLevel, Student } from '@/types';
 import { studentStats } from '@/utils/stats';
 import { cx, pct } from '@/utils/format';
@@ -19,6 +22,8 @@ type Sort = 'avg' | 'name' | 'attendance';
 export default function AdminStudents() {
   const { students, sessions, dailyWorship, deleteStudent } = useData();
   const confirmDelete = useConfirmDelete();
+  const toast = useToast();
+  const [importOpen, setImportOpen] = useState(false);
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState<'all' | CommitmentLevel>('all');
   const [sort, setSort] = useState<Sort>('avg');
@@ -38,10 +43,25 @@ export default function AdminStudents() {
         title="إدارة الطلاب"
         subtitle={`${students.length} طالبًا في المشروع`}
         actions={
-          <button className="btn-accent" onClick={() => setModal({ open: true, student: null })}>
-            <UserPlus className="h-4 w-4" />
-            إضافة طالب
-          </button>
+          <>
+            <button
+              className="btn-ghost border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+              onClick={() => downloadStudentsFile(students).catch(() => toast('تعذّر إنشاء الملف.'))}
+              title="تنزيل أسماء الطلاب ومعلوماتهم وبريد ولي الأمر كملف Excel"
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              Excel
+              <Download className="h-3.5 w-3.5" />
+            </button>
+            <button className="btn-soft" onClick={() => setImportOpen(true)}>
+              <FileUp className="h-4 w-4" />
+              رفع من Excel
+            </button>
+            <button className="btn-accent" onClick={() => setModal({ open: true, student: null })}>
+              <UserPlus className="h-4 w-4" />
+              إضافة طالب
+            </button>
+          </>
         }
       />
 
@@ -161,6 +181,7 @@ export default function AdminStudents() {
         )
       )}
 
+      <StudentsImportModal open={importOpen} onClose={() => setImportOpen(false)} />
       <StudentFormModal open={modal.open} student={modal.student} onClose={() => setModal({ open: false, student: null })} />
     </div>
   );

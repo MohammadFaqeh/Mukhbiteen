@@ -2,25 +2,60 @@
  * قراءة شيت "سجل التسميع" الأسبوعي — يقبل الشكلين المعتمدين:
  *  1. العريض (المدمج): صف أسماء الطلاب (خلايا مدموجة فوق أعمدة كل طالب)، تحته صف العناوين،
  *     ثم صف لكل تاريخ دوام، وعمود "تاريخ الدوام" أول الشيت، وصف "المجموع" بالآخر (يُتجاهل).
- *  2. الطويل: صف لكل طالب بكل تاريخ، بعمودي "اسم الطالب" و"تاريخ الدوام".
+ *  2. الطويل: صف لكل طالب بكل تاريخ، بعمودي "اسم الطالب" و"تاريخ الدوام" — وهو شكل القالب الموحّد
+ *     (public/templates/recitation-log-template.xlsx) اللي فيه كمان: الحضور، جودة الحفظ/المراجعة، الالتزام، الملاحظات، والمطلوب القادم.
  * التعرّف على الأعمدة بالكلمات المفتاحية بالعنوان (وليس بالترتيب)، فإضافة/تبديل أعمدة لا يكسر الاستيراد.
  */
 import type { CellObject, WorkSheet } from 'xlsx';
+import type { AttendanceStatus, CommitmentLevel } from '@/types';
+import { parsePageRanges } from './quran';
 
 const loadXlsx = () => import('xlsx');
 
-export type LogField = 'memRequired' | 'memText' | 'memCompleted' | 'revRequired' | 'revText' | 'revCompleted' | 'grade';
+export type LogField =
+  | 'memRequired'
+  | 'memText'
+  | 'memCompleted'
+  | 'memGrade'
+  | 'revRequired'
+  | 'revText'
+  | 'revCompleted'
+  | 'revGrade'
+  | 'grade'
+  | 'attendance'
+  | 'commitment'
+  | 'notes'
+  | 'nextMem'
+  | 'nextRev'
+  | 'nextExtra';
 
 export interface LogEntry {
   studentName: string;
   date: string; // YYYY-MM-DD
+  row: number; // رقم الصف بالملف (لرسائل التنبيه)
+  attendance?: AttendanceStatus;
   memRequired?: number;
   memText?: string;
   memCompleted?: number;
+  memGrade?: number;
   revRequired?: number;
   revText?: string;
   revCompleted?: number;
-  grade?: number; // جودة التسميع /100 (غالبًا فارغة بالشيت)
+  revGrade?: number;
+  grade?: number; // جودة تسميع مشتركة للحفظ والمراجعة (عمود واحد بالشيت القديم)
+  commitment?: CommitmentLevel;
+  notes?: string;
+  nextMem?: string;
+  nextRev?: string;
+  nextExtra?: string;
+}
+
+/** ملاحظة على صف بالملف — لا تمنع الاستيراد، لكن تُعرض قبل الحفظ */
+export interface LogIssue {
+  row: number;
+  studentName: string;
+  date: string;
+  message: string;
 }
 
 export interface ParsedLog {
@@ -28,6 +63,7 @@ export interface ParsedLog {
   studentNames: string[]; // بترتيب ظهورها بالملف
   dates: string[]; // مرتبة تصاعديًا
   entries: LogEntry[];
+  issues: LogIssue[];
 }
 
 /** توحيد النص العربي للمقارنة: إزالة التشكيل وتوحيد الألف والتاء المربوطة والياء والمسافات */
@@ -44,9 +80,14 @@ export const normalizeArabic = (s: string) =>
 export function classifyHeader(raw: string): LogField | null {
   const h = normalizeArabic(raw);
   if (!h) return null;
-  if (h.includes('جوده')) return 'grade';
   const mem = h.includes('حفظ');
   const rev = h.includes('مراجع');
+  // "المطلوب القادم: ..." يُفحص أولًا لأنه فيه كمان "مطلوب" و"حفظ"
+  if (h.includes('قادم')) return h.includes('مهمه') ? 'nextExtra' : mem ? 'nextMem' : rev ? 'nextRev' : null;
+  if (h.includes('جوده')) return mem ? 'memGrade' : rev ? 'revGrade' : 'grade';
+  if (h.includes('حضور')) return 'attendance';
+  if (h.includes('التزام')) return 'commitment';
+  if (h.includes('ملاحظ')) return 'notes';
   if (!mem && !rev) return null;
   let kind: 'Required' | 'Text' | 'Completed' | null = null;
   if (h.includes('مطلوب')) kind = 'Required';
@@ -59,14 +100,14 @@ export function classifyHeader(raw: string): LogField | null {
 const pad = (n: number) => String(n).padStart(2, '0');
 const toLatinDigits = (s: string) => s.replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
 
-type Xlsx = Awaited<ReturnType<typeof loadXlsx>>;
+export type Xlsx = Awaited<ReturnType<typeof loadXlsx>>;
 
 function isDateCell(X: Xlsx, c: CellObject) {
   return c.t === 'd' || (c.t === 'n' && !!c.z && X.SSF.is_date(c.z as string));
 }
 
 /** قيمة خلية التاريخ → YYYY-MM-DD، أو null إن لم تكن تاريخًا (مثل صف "المجموع") */
-function readDate(X: Xlsx, c: CellObject | undefined): string | null {
+export function readDate(X: Xlsx, c: CellObject | undefined): string | null {
   if (!c || c.v === undefined || c.v === '') return null;
   if (c.t === 'd' && c.v instanceof Date) return `${c.v.getFullYear()}-${pad(c.v.getMonth() + 1)}-${pad(c.v.getDate())}`;
   if (c.t === 'n' && typeof c.v === 'number' && c.v > 20000 && c.v < 80000) {
@@ -107,6 +148,26 @@ function readGrade(c: CellObject | undefined): number | undefined {
   return n <= 1 && typeof c?.z === 'string' && c.z.includes('%') ? Math.round(n * 100) : n;
 }
 
+const ATTENDANCE_WORDS: [string, AttendanceStatus][] = [
+  ['بعذر', 'excused'],
+  ['معذور', 'excused'],
+  ['متاخر', 'late'],
+  ['غائب', 'absent'],
+  ['غياب', 'absent'],
+  ['حاضر', 'present'],
+];
+const COMMITMENT_WORDS: [string, CommitmentLevel][] = [
+  ['جيد جدا', 'very_good'],
+  ['ممتاز', 'excellent'],
+  ['متابعه', 'needs_work'],
+  ['ضعيف', 'needs_work'],
+  ['جيد', 'good'],
+];
+function pickWord<T>(list: [string, T][], raw: string) {
+  const s = normalizeArabic(raw);
+  return list.find(([w]) => s.includes(w))?.[1];
+}
+
 function cellText(sheet: WorkSheet, X: Xlsx, r: number, c: number) {
   const cell = sheet[X.utils.encode_cell({ r, c })] as CellObject | undefined;
   return cell ? String(cell.w ?? cell.v ?? '').trim() : '';
@@ -144,6 +205,7 @@ export async function parseRecitationLog(file: File): Promise<ParsedLog> {
   const nameCol = findCol([headerRow], 'اسم');
 
   const entries: LogEntry[] = [];
+  const issues: LogIssue[] = [];
 
   if (nameCol >= 0) {
     // ---------- الشكل الطويل: صف لكل طالب بكل تاريخ ----------
@@ -151,8 +213,8 @@ export async function parseRecitationLog(file: File): Promise<ParsedLog> {
       const name = cellText(sheet, X, r, nameCol);
       const date = readDate(X, get(r, dateCol));
       if (!name || !date) continue;
-      const e: LogEntry = { studentName: name, date };
-      fields.forEach((f, c) => f && assign(X, e, f, get(r, c)));
+      const e: LogEntry = { studentName: name, date, row: r + 1 };
+      fields.forEach((f, c) => f && assign(X, e, f, get(r, c), issues));
       if (hasData(e)) entries.push(e);
     }
   } else {
@@ -186,29 +248,108 @@ export async function parseRecitationLog(file: File): Promise<ParsedLog> {
       const date = readDate(X, get(r, dateCol));
       if (!date) continue;
       blocks.forEach((cols, name) => {
-        const e: LogEntry = { studentName: name, date };
-        cols.forEach(({ field, col }) => assign(X, e, field, get(r, col)));
+        const e: LogEntry = { studentName: name, date, row: r + 1 };
+        cols.forEach(({ field, col }) => assign(X, e, field, get(r, col), issues));
         if (hasData(e)) entries.push(e);
       });
     }
   }
 
   if (!entries.length) throw new LogParseError('ما لقيت أي بيانات تسميع داخل الملف.');
+
+  // نفس الطالب بنفس التاريخ مرتين: يُعتمد الصف الأخير مع تنبيه
+  const byKey = new Map<string, LogEntry>();
+  entries.forEach((e) => {
+    const key = `${normalizeArabic(e.studentName)}|${e.date}`;
+    const before = byKey.get(key);
+    if (before) issues.push({ ...where(e), message: `الطالب مكرّر بنفس التاريخ (الصف ${before.row} والصف ${e.row}) — تم اعتماد الصف ${e.row}` });
+    byKey.set(key, e);
+  });
+  const unique = [...byKey.values()];
+
+  // تنبيه الجودة الناقصة فقط إذا الملف فيه أعمدة جودة منفصلة (القالب الموحّد) — الشيت القديم غالبًا بلا جودة
+  const gradeCols = fields.includes('memGrade') || fields.includes('revGrade');
+  unique.forEach((e) => {
+    // القالب الموحّد: الصفحات المسمّعة أرقام صفحات (415-416) — تتوحّد كتابتها، ومنها يُحسب عدد المسمّع إذا تُرك فاضي
+    if (gradeCols)
+      (['mem', 'rev'] as const).forEach((k) => {
+        const text = e[`${k}Text`];
+        if (!text) return;
+        const label = k === 'mem' ? 'الحفظ' : 'المراجعة';
+        const parsed = parsePageRanges(text);
+        if (!parsed) {
+          issues.push({ ...where(e), message: `صفحات ${label} المسمّعة "${text}" مش أرقام صفحات — اكتبها مثل 415-416` });
+          return;
+        }
+        e[`${k}Text`] = parsed.text;
+        const done = e[`${k}Completed`];
+        if (done === undefined) e[`${k}Completed`] = parsed.pages;
+        else if (done !== parsed.pages) issues.push({ ...where(e), message: `${label}: مكتوب ${done} صفحات مسمّعة لكن ${parsed.text} = ${parsed.pages} — تم اعتماد ${done}` });
+      });
+    const recited = (e.memCompleted ?? 0) > 0 || (e.revCompleted ?? 0) > 0;
+    if ((e.attendance === 'absent' || e.attendance === 'excused') && recited) issues.push({ ...where(e), message: 'مكتوب غائب لكن فيه صفحات مسمّعة — سيُسجَّل غائبًا بدون الصفحات' });
+    if (gradeCols && e.attendance !== 'absent' && e.attendance !== 'excused') {
+      if ((e.memCompleted ?? 0) > 0 && e.memGrade === undefined && e.grade === undefined) issues.push({ ...where(e), message: 'سمّع حفظ بدون جودة الحفظ — ستُستخدم الجودة الافتراضية' });
+      if ((e.revCompleted ?? 0) > 0 && e.revGrade === undefined && e.grade === undefined) issues.push({ ...where(e), message: 'سمّع مراجعة بدون جودة المراجعة — ستُستخدم الجودة الافتراضية' });
+    }
+  });
+
   return {
     format: nameCol >= 0 ? 'long' : 'wide',
-    studentNames: [...new Set(entries.map((e) => e.studentName))],
-    dates: [...new Set(entries.map((e) => e.date))].sort(),
-    entries,
+    studentNames: [...new Set(unique.map((e) => e.studentName))],
+    dates: [...new Set(unique.map((e) => e.date))].sort(),
+    entries: unique,
+    issues: issues.sort((a, b) => a.row - b.row),
   };
 }
 
-function assign(X: Xlsx, e: LogEntry, f: LogField, c: CellObject | undefined) {
-  if (f === 'memText' || f === 'revText') e[f] = readText(X, c);
-  else if (f === 'grade') e.grade = readGrade(c);
-  else e[f] = readNumber(c);
+const where = (e: LogEntry) => ({ row: e.row, studentName: e.studentName, date: e.date });
+
+function assign(X: Xlsx, e: LogEntry, f: LogField, c: CellObject | undefined, issues: LogIssue[]) {
+  const raw = c ? String(c.w ?? c.v ?? '').trim() : '';
+  switch (f) {
+    case 'memText':
+    case 'revText':
+      e[f] = readText(X, c);
+      return;
+    case 'notes':
+    case 'nextMem':
+    case 'nextRev':
+    case 'nextExtra':
+      e[f] = raw || undefined;
+      return;
+    case 'attendance':
+      if (!raw) return;
+      e.attendance = pickWord(ATTENDANCE_WORDS, raw);
+      if (!e.attendance) issues.push({ ...where(e), message: `قيمة الحضور "${raw}" غير معروفة (المسموح: حاضر، متأخر، غائب، غائب بعذر)` });
+      return;
+    case 'commitment':
+      if (!raw) return;
+      e.commitment = pickWord(COMMITMENT_WORDS, raw);
+      if (!e.commitment) issues.push({ ...where(e), message: `قيمة الالتزام "${raw}" غير معروفة — تم تجاهلها` });
+      return;
+    case 'grade':
+    case 'memGrade':
+    case 'revGrade': {
+      const g = readGrade(c);
+      if (g === undefined && raw) issues.push({ ...where(e), message: `جودة التسميع "${raw}" مش رقم — تم تجاهلها` });
+      else if (g !== undefined && (g < 0 || g > 100)) issues.push({ ...where(e), message: `جودة التسميع ${g} خارج المدى 0-100 — تم تجاهلها` });
+      else e[f] = g;
+      return;
+    }
+    default: {
+      const n = readNumber(c);
+      if (n === undefined && raw) issues.push({ ...where(e), message: `"${raw}" مش رقم بعمود عدد الصفحات — تم تجاهله` });
+      else if (n !== undefined && n < 0) issues.push({ ...where(e), message: `عدد صفحات سالب (${n}) — تم تجاهله` });
+      else e[f] = n;
+    }
+  }
 }
 
 /** صف الطالب فاضي تمامًا بهذا التاريخ = لم يُسجَّل له شيء (عطلة/لم يُدخل) — لا يُنشأ له دوام */
 function hasData(e: LogEntry) {
-  return [e.memRequired, e.memCompleted, e.revRequired, e.revCompleted, e.grade].some((v) => v !== undefined) || !!e.memText || !!e.revText;
+  return (
+    [e.attendance, e.memRequired, e.memCompleted, e.memGrade, e.revRequired, e.revCompleted, e.revGrade, e.grade, e.commitment].some((v) => v !== undefined) ||
+    !!(e.memText || e.revText || e.notes || e.nextMem || e.nextRev || e.nextExtra)
+  );
 }

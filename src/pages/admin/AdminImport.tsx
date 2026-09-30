@@ -1,15 +1,16 @@
-import { useMemo, useState, type ChangeEvent } from 'react';
-import { AlertTriangle, FileSpreadsheet, Loader2, Trash2, UploadCloud } from 'lucide-react';
+import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
+import { AlertTriangle, Download, FileSpreadsheet, Loader2, Trash2, UploadCloud } from 'lucide-react';
 import { useData } from '@/context/DataContext';
 import { useToast } from '@/context/ToastContext';
 import PageHeader from '@/components/shared/PageHeader';
 import Select from '@/components/ui/Select';
-import type { AttendanceStatus, DailyWorship, MemorizationEntry, RevisionEntry, SessionRecord, Student } from '@/types';
+import type { AttendanceStatus, DailyWorship, MemorizationEntry, NextRequirement, RevisionEntry, SessionRecord, Student } from '@/types';
 import { LogParseError, normalizeArabic, parseRecitationLog, type LogEntry, type ParsedLog } from '@/utils/recitationLog';
 import { completionPercent } from '@/utils/quran';
 import { suggestScore } from '@/utils/stats';
 import { weekDates, weekStartOf, weekWorshipScore } from '@/utils/worship';
 import { PROJECT } from '@/data/project';
+import { TODAY } from '@/utils/today';
 import { cx, formatDate, formatLongDate } from '@/utils/format';
 
 const NEW_STUDENT = '__new__';
@@ -39,13 +40,20 @@ function saveNameMap(pairs: [string, string][]) {
 
 const pagesLabel = (n: number) => (n >= 3 && n <= 10 ? `${n} صفحات` : `${n} صفحة`);
 
-/** يحوّل صف الشيت لسجل دوام، مع الحفاظ على ما أُدخل يدويًا بالموقع (الالتزام، الملاحظات، العلامة...) */
+/** القالب الموحّد الجاهز للتعبئة (public/templates) */
+const TEMPLATE_URL = `${import.meta.env.BASE_URL}templates/recitation-log-template.xlsx`;
+
+/**
+ * يحوّل صف الشيت لسجل دوام. الخلية الفاضية بالملف لا تمسح شيئًا: الالتزام والملاحظات والعلامة
+ * المدخلة يدويًا بالموقع تبقى كما هي إلا إذا الملف فيه قيمة لها.
+ */
 function toSession(e: LogEntry, studentId: string, prev: SessionRecord | undefined, opts: { defaultGrade: number; zeroAs: AttendanceStatus; weekWorship: number }): SessionRecord {
   const id = `${studentId}-${e.date}`;
   const recited = (e.memCompleted ?? 0) > 0 || (e.revCompleted ?? 0) > 0;
   const prevAttended = prev?.attendance === 'present' || prev?.attendance === 'late';
-  const attendance: AttendanceStatus = recited ? (prevAttended ? prev!.attendance : 'present') : prev?.attendance ?? opts.zeroAs;
-  if (attendance !== 'present' && attendance !== 'late') return { id, studentId, date: e.date, attendance, notes: prev?.notes };
+  const attendance: AttendanceStatus = e.attendance ?? (recited ? (prevAttended ? prev!.attendance : 'present') : prev?.attendance ?? opts.zeroAs);
+  const notes = e.notes ?? prev?.notes;
+  if (attendance !== 'present' && attendance !== 'late') return { id, studentId, date: e.date, attendance, notes };
 
   const hasMem = (e.memRequired ?? 0) > 0 || (e.memCompleted ?? 0) > 0 || !!e.memText;
   const hasRev = (e.revRequired ?? 0) > 0 || (e.revCompleted ?? 0) > 0 || !!e.revText;
@@ -60,7 +68,7 @@ function toSession(e: LogEntry, studentId: string, prev: SessionRecord | undefin
         requiredPages: memReq,
         completedPages: memDone,
         completion: completionPercent(memReq, memDone),
-        grade: e.grade ?? prev?.memorization?.grade ?? opts.defaultGrade,
+        grade: e.memGrade ?? e.grade ?? prev?.memorization?.grade ?? opts.defaultGrade,
         notes: prev?.memorization?.notes,
       }
     : null;
@@ -71,25 +79,54 @@ function toSession(e: LogEntry, studentId: string, prev: SessionRecord | undefin
         requiredPages: revReq,
         completedPages: revDone,
         completion: completionPercent(revReq, revDone),
-        grade: e.grade ?? prev?.revision?.grade ?? opts.defaultGrade,
+        grade: e.revGrade ?? e.grade ?? prev?.revision?.grade ?? opts.defaultGrade,
         notes: prev?.revision?.notes,
       }
     : null;
+  const commitment = e.commitment ?? prev?.commitment;
   return {
     id,
     studentId,
     date: e.date,
     attendance,
-    commitment: prev?.commitment,
-    score: prev?.score ?? suggestScore({ attendance, memGrade: memorization?.grade, revGrade: revision?.grade, weekWorship: opts.weekWorship }),
+    commitment,
+    // العلامة تُحسب دائمًا بالمعادلة الموحّدة من بيانات الملف (الجزء غير المطلوب لا يُحسب)
+    score: suggestScore({ attendance, mem: memorization, rev: revision, weekWorship: opts.weekWorship, commitment }),
     memorization,
     revision,
-    notes: prev?.notes,
+    notes,
   };
 }
 
+/** بصمة محتوى السجل — لمعرفة إذا صف الملف بيغيّر شيئًا فعلًا عن المحفوظ بالموقع */
+function signature(s: SessionRecord) {
+  const part = (p: MemorizationEntry | RevisionEntry | null | undefined, text: string | undefined) =>
+    p ? [p.required, text ?? '', p.requiredPages, p.completedPages, p.completion, p.grade, p.notes || ''] : null;
+  return JSON.stringify([
+    s.attendance,
+    s.commitment ?? '',
+    s.score ?? null,
+    s.notes || '',
+    part(s.memorization, s.memorization?.recited),
+    part(s.revision, s.revision?.revised),
+  ]);
+}
+
+const nextWeek = (iso: string) => {
+  const d = new Date(`${iso}T12:00:00`);
+  d.setDate(d.getDate() + 7);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+/** المطلوب القادم من آخر صف للطالب (ضمن الفترة) — الصفوف الأقدم لا تغيّر المطلوب الحالي */
+function requirementFrom(entries: LogEntry[]): Omit<NextRequirement, 'studentId'> | null {
+  const last = entries.reduce<LogEntry | null>((a, e) => (!a || e.date > a.date ? e : a), null);
+  if (!last || !(last.nextMem || last.nextRev || last.nextExtra)) return null;
+  return { date: nextWeek(last.date), memorization: last.nextMem ?? '', revision: last.nextRev ?? '', extraTask: last.nextExtra ?? '', updatedAt: TODAY };
+}
+
 export default function AdminImport() {
-  const { students, sessions, dailyWorship, upsertSessions, addStudent, deleteSessions } = useData();
+  const { students, sessions, dailyWorship, nextRequirements, upsertSessions, addStudent, deleteSessions, saveRequirement } = useData();
   const toast = useToast();
 
   const [log, setLog] = useState<ParsedLog | null>(null);
@@ -134,40 +171,65 @@ export default function AdminImport() {
     }
   };
 
-  const sessionIds = useMemo(() => new Set(sessions.map((s) => s.id)), [sessions]);
+  const sessionById = useMemo(() => new Map(sessions.map((s) => [s.id, s])), [sessions]);
 
-  /** صفوف الملف الداخلة فعلًا بالاستيراد (حسب الفترة والخيارات)، مجمّعة حسب اسم الطالب بالملف */
+  const worshipFor = useCallback(
+    (studentId: string, date: string) => {
+      const dates = weekDates(weekStartOf(date)).filter((d) => d <= date);
+      const days = dates.map((d) => dailyWorship.find((w) => w.id === `${studentId}-${d}`)).filter((x): x is DailyWorship => !!x);
+      return weekWorshipScore(days);
+    },
+    [dailyWorship],
+  );
+
+  /**
+   * صفوف الملف اللي بتنحفظ فعلًا، مجمّعة حسب اسم الطالب بالملف: الجديدة + القديمة اللي تغيّرت.
+   * الصفوف المطابقة للمحفوظ بالموقع تُتخطّى — فرفع نفس الملف كل أسبوع لا يلمس الأسابيع السابقة.
+   */
   const plan = useMemo(() => {
-    const perName = new Map<string, { entries: LogEntry[]; fresh: number; updates: number }>();
+    const perName = new Map<string, { entries: LogEntry[]; fresh: number; updates: number; same: number; requirement: Omit<NextRequirement, 'studentId'> | null }>();
     if (!log) return perName;
     const idOf = new Map(matches.map((m) => [m.fileName, m]));
-    log.entries.forEach((e) => {
-      if (e.date < from || e.date > to) return;
+    const inRange = log.entries.filter((e) => e.date >= from && e.date <= to);
+    inRange.forEach((e) => {
       const m = idOf.get(e.studentName);
-      const exists = !!m?.studentId && m.studentId !== NEW_STUDENT && sessionIds.has(`${m.studentId}-${e.date}`);
-      if (onlyNew && exists) return;
-      const p = perName.get(e.studentName) ?? { entries: [], fresh: 0, updates: 0 };
-      p.entries.push(e);
-      if (exists) p.updates++;
-      else p.fresh++;
+      const sid = m?.studentId && m.studentId !== NEW_STUDENT ? m.studentId : '';
+      const prev = sid ? sessionById.get(`${sid}-${e.date}`) : undefined;
+      const p = perName.get(e.studentName) ?? { entries: [], fresh: 0, updates: 0, same: 0, requirement: null };
       perName.set(e.studentName, p);
+      if (prev) {
+        if (onlyNew || signature(toSession(e, sid, prev, { defaultGrade, zeroAs, weekWorship: worshipFor(sid, e.date) })) === signature(prev)) {
+          p.same++;
+          return;
+        }
+        p.updates++;
+      } else p.fresh++;
+      p.entries.push(e);
+    });
+    perName.forEach((p, name) => {
+      const req = requirementFrom(inRange.filter((e) => e.studentName === name));
+      const sid = idOf.get(name)?.studentId;
+      const cur = sid ? nextRequirements.find((r) => r.studentId === sid) : undefined;
+      const unchanged = cur && cur.memorization === req?.memorization && cur.revision === req.revision && (cur.extraTask ?? '') === req.extraTask && cur.date === req.date;
+      // لا نرجّع المطلوب لتاريخ أقدم من المحدد حاليًا بالموقع (مثلًا ملف قديم)
+      if (req && !unchanged && !(cur && cur.date > req.date)) p.requirement = req;
     });
     return perName;
-  }, [log, matches, from, to, onlyNew, sessionIds]);
+  }, [log, matches, from, to, onlyNew, sessionById, nextRequirements, defaultGrade, zeroAs, worshipFor]);
 
   const active = matches.filter((m) => !m.ignored);
-  const unresolved = active.filter((m) => !m.studentId && plan.get(m.fileName)?.entries.length).length;
+  const pending = (name: string) => {
+    const p = plan.get(name);
+    return (p?.entries.length ?? 0) + (p?.requirement ? 1 : 0);
+  };
+  const unresolved = active.filter((m) => !m.studentId && pending(m.fileName)).length;
   const totalRows = active.reduce((a, m) => a + (plan.get(m.fileName)?.entries.length ?? 0), 0);
+  const totalReqs = active.filter((m) => plan.get(m.fileName)?.requirement).length;
+  const totalSame = active.reduce((a, m) => a + (plan.get(m.fileName)?.same ?? 0), 0);
   const takenIds = new Set(matches.filter((m) => !m.ignored && m.studentId && m.studentId !== NEW_STUDENT).map((m) => m.studentId));
   const duplicateTarget = matches.some((m, i) => !m.ignored && m.studentId && m.studentId !== NEW_STUDENT && matches.findIndex((x) => !x.ignored && x.studentId === m.studentId) !== i);
 
   const setMatch = (fileName: string, p: Partial<NameMatch>) => setMatches((ms) => ms.map((m) => (m.fileName === fileName ? { ...m, ...p } : m)));
-
-  const worshipFor = (studentId: string, date: string) => {
-    const dates = weekDates(weekStartOf(date)).filter((d) => d <= date);
-    const days = dates.map((d) => dailyWorship.find((w) => w.id === `${studentId}-${d}`)).filter((x): x is DailyWorship => !!x);
-    return weekWorshipScore(days);
-  };
 
   const runImport = async () => {
     if (!log) return;
@@ -175,23 +237,29 @@ export default function AdminImport() {
     try {
       const idByName = new Map<string, string>();
       for (const m of active) {
-        if (!m.studentId || !plan.get(m.fileName)?.entries.length) continue;
+        if (!m.studentId || !pending(m.fileName)) continue;
         if (m.studentId === NEW_STUDENT) {
-          const first = plan.get(m.fileName)!.entries.map((e) => e.date).sort()[0];
+          const first = log.entries.filter((e) => e.studentName === m.fileName).map((e) => e.date).sort()[0];
           const created: Student = await addStudent({ name: m.fileName, shortName: m.fileName, birthDate: '', group: PROJECT.group, guardianName: '', guardianEmail: '', joinedAt: first, notes: '', active: true });
           idByName.set(m.fileName, created.id);
         } else idByName.set(m.fileName, m.studentId);
       }
-      const byId = new Map(sessions.map((s) => [s.id, s]));
       const records: SessionRecord[] = [];
+      const requirements: NextRequirement[] = [];
       idByName.forEach((sid, name) => {
-        plan.get(name)!.entries.forEach((e) => {
-          records.push(toSession(e, sid, byId.get(`${sid}-${e.date}`), { defaultGrade, zeroAs, weekWorship: worshipFor(sid, e.date) }));
+        const p = plan.get(name)!;
+        p.entries.forEach((e) => {
+          records.push(toSession(e, sid, sessionById.get(`${sid}-${e.date}`), { defaultGrade, zeroAs, weekWorship: worshipFor(sid, e.date) }));
         });
+        if (p.requirement) {
+          const cur = nextRequirements.find((r) => r.studentId === sid);
+          requirements.push({ ...p.requirement, studentId: sid, notes: cur?.notes ?? '' });
+        }
       });
-      await upsertSessions(records);
+      if (records.length) await upsertSessions(records);
+      for (const r of requirements) await saveRequirement(r);
       saveNameMap([...idByName].map(([name, sid]) => [normalizeArabic(name), sid]));
-      toast(`تم استيراد ${records.length} سجل دوام لـ ${idByName.size} طالبًا`);
+      toast(`تم حفظ ${records.length} سجل دوام${requirements.length ? ` و${requirements.length} مطلوب قادم` : ''}`);
       reset();
     } catch (x) {
       toast(x instanceof Error ? x.message : 'حدث خطأ أثناء الاستيراد.');
@@ -226,6 +294,15 @@ export default function AdminImport() {
 
       {!log ? (
         <section className="card space-y-3 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-emerald-50/60 px-4 py-3">
+            <div className="text-[13px] text-navy-700">
+              <p className="font-bold">القالب الموحّد (ملف واحد لكل السنة)</p>
+              <p className="text-[12px] text-navy-500">كل دوام أضف صفوف الطلاب تحت آخر صف، وارفع نفس الملف — الموقع يحفظ الجديد والمعدّل فقط، والأسابيع السابقة تبقى كما هي.</p>
+            </div>
+            <a className="btn-ghost" href={TEMPLATE_URL} download="قالب-سجل-التسميع.xlsx">
+              <Download className="h-4 w-4" /> تنزيل القالب
+            </a>
+          </div>
           <label className="flex cursor-pointer flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-navy-200 bg-navy-50/40 p-10 text-center text-[13px] text-navy-500 hover:bg-navy-50">
             {busy ? <Loader2 className="h-9 w-9 animate-spin text-navy-300" /> : <UploadCloud className="h-9 w-9 text-navy-300" />}
             {busy ? 'جارٍ القراءة...' : 'اختر ملف سجل التسميع (xlsx) من جهازك'}
@@ -238,10 +315,10 @@ export default function AdminImport() {
           )}
           <ul className="space-y-1 text-[12px] text-navy-400">
             <li className="flex items-center gap-2">
-              <FileSpreadsheet className="h-4 w-4 shrink-0" /> نفس شيت "سجل التسميع": عمود تاريخ الدوام، واسم كل طالب فوق أعمدته (حفظ مطلوب، الصفحات المسمّعة حفظًا، حفظ مسمّع، مراجعة مطلوبة، الصفحات المسمّعة مراجعةً، مراجعة مسمّعة، جودة التسميع %).
+              <FileSpreadsheet className="h-4 w-4 shrink-0" /> القالب الموحّد: صف لكل طالب بكل دوام — الحضور، الحفظ والمراجعة (مطلوب / مسمّع / الصفحات / الجودة)، الالتزام، الملاحظات، والمطلوب للدوام القادم.
             </li>
-            <li className="pr-6">يقبل كمان الشكل الطويل (صف لكل طالب بكل تاريخ مع عمود "اسم الطالب"). صف "المجموع" والتواريخ الفاضية يتم تجاهلها تلقائيًا.</li>
-            <li className="pr-6">كل أسبوع ارفع نفس الملف بعد إضافة الأسبوع الجديد — الأيام الموجودة تتحدّث بدون تكرار.</li>
+            <li className="pr-6">الشيت القديم (أسماء الطلاب فوق الأعمدة) لسا مقبول. صف "المجموع" والصفوف الفاضية يتم تجاهلها تلقائيًا.</li>
+            <li className="pr-6">الخلية الفاضية ما بتمسح شي: الالتزام والملاحظات المدخلة بالموقع تبقى إذا ما كتبتها بالملف. والجزء المتروك فاضي (ما عليه حفظ أو مراجعة) ما بينحسب عليه.</li>
           </ul>
         </section>
       ) : (
@@ -286,10 +363,30 @@ export default function AdminImport() {
             </div>
             <label className="flex items-center gap-2 text-[13px] text-navy-700">
               <input type="checkbox" className="h-4 w-4 accent-burgundy-600" checked={onlyNew} onChange={(e) => setOnlyNew(e.target.checked)} />
-              استيراد الأيام الجديدة فقط (تجاهل الأيام المسجّلة مسبقًا بالموقع)
+              الأيام الجديدة فقط (لا تحدّث أي يوم مسجّل مسبقًا بالموقع حتى لو تغيّر بالملف)
             </label>
-            <p className="text-[12px] text-navy-400">الأيام المسجّلة مسبقًا تتحدّث أرقام الحفظ والمراجعة فيها فقط — الالتزام والملاحظات والعلامة المدخلة يدويًا تبقى كما هي.</p>
+            <p className="text-[12px] text-navy-400">
+              الأيام المسجّلة مسبقًا واللي ما تغيّرت بالملف يتم تخطيها ({totalSame} سجل). الخلايا الفاضية بالملف ما بتمسح الالتزام والملاحظات المدخلة بالموقع. علامة اليوم تُحسب بالمعادلة الموحّدة.
+            </p>
           </section>
+
+          {log.issues.length > 0 && (
+            <section className="card overflow-hidden">
+              <div className="flex items-center gap-2 border-b border-navy-50 bg-amber-50/60 px-5 py-3 text-[13px] font-bold text-amber-800">
+                <AlertTriangle className="h-4 w-4" /> {log.issues.length} ملاحظة على الملف — راجعها، أو صحّحها بالملف وارفعه من جديد
+              </div>
+              <ul className="scrollbar-thin max-h-60 divide-y divide-navy-50 overflow-y-auto text-[12px]">
+                {log.issues.map((i, k) => (
+                  <li key={k} className="flex flex-wrap gap-x-3 px-5 py-2">
+                    <span className="font-mono text-navy-400">صف {i.row}</span>
+                    <span className="font-medium text-navy-800">{i.studentName}</span>
+                    <span className="text-navy-400">{formatDate(i.date)}</span>
+                    <span className="text-navy-600">{i.message}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           {(unresolved > 0 || duplicateTarget) && (
             <p className="flex items-center gap-2 rounded-xl bg-amber-50 px-3 py-2 text-[12px] text-amber-700">
@@ -300,13 +397,15 @@ export default function AdminImport() {
 
           <section className="card overflow-hidden">
             <div className="scrollbar-thin overflow-x-auto">
-              <table className="w-full min-w-[820px] text-[13px]">
+              <table className="w-full min-w-[980px] text-[13px]">
                 <thead className="bg-navy-50/60 text-right text-[12px] text-navy-500">
                   <tr>
                     <th className="px-5 py-3 font-medium">الاسم بالملف</th>
                     <th className="px-3 py-3 font-medium">الطالب بالموقع</th>
                     <th className="px-3 py-3 font-medium">أيام جديدة</th>
                     <th className="px-3 py-3 font-medium">أيام تتحدّث</th>
+                    <th className="px-3 py-3 font-medium">بدون تغيير</th>
+                    <th className="px-3 py-3 font-medium">المطلوب القادم</th>
                     <th className="px-3 py-3 font-medium">الحفظ (مطلوب / مسمّع)</th>
                     <th className="px-3 py-3 font-medium">المراجعة (مطلوب / مسمّع)</th>
                     <th className="px-5 py-3" />
@@ -335,6 +434,8 @@ export default function AdminImport() {
                         </td>
                         <td className="px-3 py-2.5 text-emerald-700">{p?.fresh ?? 0}</td>
                         <td className="px-3 py-2.5 text-navy-600">{p?.updates ?? 0}</td>
+                        <td className="px-3 py-2.5 text-navy-300">{p?.same ?? 0}</td>
+                        <td className="px-3 py-2.5 text-navy-600">{p?.requirement ? `${formatDate(p.requirement.date)} ✓` : '—'}</td>
                         <td className="px-3 py-2.5 text-navy-600">
                           {sum('memRequired')} / {sum('memCompleted')}
                         </td>
@@ -355,8 +456,10 @@ export default function AdminImport() {
           </section>
 
           <div className="sticky bottom-3 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-navy-100 bg-white/95 px-5 py-3 shadow-lift backdrop-blur">
-            <span className="text-[13px] text-navy-500">{totalRows} سجل دوام جاهز للحفظ</span>
-            <button className="btn-accent px-10 py-3 text-[15px]" onClick={runImport} disabled={busy || totalRows === 0 || unresolved > 0 || duplicateTarget}>
+            <span className="text-[13px] text-navy-500">
+              {totalRows + totalReqs === 0 ? 'لا يوجد أي جديد بالملف — كل شيء محفوظ مسبقًا' : `${totalRows} سجل دوام${totalReqs ? ` + ${totalReqs} مطلوب قادم` : ''} جاهز للحفظ`}
+            </span>
+            <button className="btn-accent px-10 py-3 text-[15px]" onClick={runImport} disabled={busy || totalRows + totalReqs === 0 || unresolved > 0 || duplicateTarget}>
               {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <UploadCloud className="h-5 w-5" />} استيراد وحفظ
             </button>
           </div>

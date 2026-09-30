@@ -125,7 +125,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const getRequirement = useCallback((sid: string) => data.nextRequirements.find((r) => r.studentId === sid), [data.nextRequirements]);
 
   const addStudent = useCallback(async (s: Omit<Student, 'id'>) => {
-    const created: Student = { ...s, id: `s${Date.now().toString(36)}` };
+    const created: Student = { ...s, id: `s${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}` }; // لاحقة عشوائية: الاستيراد الجماعي يضيف عدة طلاب بنفس الجزء من الثانية
     const { error: err } = await supabase.from('students').insert(studentToRow(created));
     if (err) throw new Error(err.message);
     setData((d) => ({ ...d, students: [...d.students, created].sort((a, b) => a.name.localeCompare(b.name, 'ar')) }));

@@ -10,7 +10,7 @@ import { useToast } from '@/context/ToastContext';
 import { TODAY } from '@/utils/today';
 import { suggestScore } from '@/utils/stats';
 import { weekDates, weekStartOf, weekWorshipScore } from '@/utils/worship';
-import { completionPercent, completionStatus } from '@/utils/quran';
+import { completionPercent, completionStatus, isAssigned } from '@/utils/quran';
 import { pct } from '@/utils/format';
 
 function blank(studentId: string, date = TODAY): SessionRecord {
@@ -73,7 +73,7 @@ export default function SessionForm({ studentId, initial, onSaved, onCancel }: P
   }, [dailyWorship, studentId, s.date]);
 
   const auto = () =>
-    set('score', suggestScore({ attendance: s.attendance, memGrade: hasMem ? s.memorization?.grade : undefined, revGrade: hasRev ? s.revision?.grade : undefined, weekWorship }));
+    set('score', suggestScore({ attendance: s.attendance, mem: hasMem ? s.memorization : null, rev: hasRev ? s.revision : null, weekWorship, commitment: s.commitment }));
 
   const newId = `${studentId}-${s.date}`;
   const dateChanged = !!initial && initial.id !== newId;
@@ -84,7 +84,14 @@ export default function SessionForm({ studentId, initial, onSaved, onCancel }: P
   const save = async () => {
     if (exists && !confirm('يوجد سجل آخر لهذا الطالب في نفس التاريخ، سيتم استبداله. هل تريد المتابعة؟')) return;
     const record: SessionRecord = attended
-      ? { ...s, id: newId, memorization: hasMem ? s.memorization : null, revision: hasRev ? s.revision : null, score: s.score ?? suggestScore({ attendance: s.attendance, memGrade: s.memorization?.grade, revGrade: s.revision?.grade, weekWorship }) }
+      ? {
+          ...s,
+          id: newId,
+          // جزء مفعّل لكن بمطلوب 0 ومسمّع 0 = غير مطلوب، يُحفظ فاضي بدل 0%
+          memorization: hasMem && isAssigned(s.memorization) ? s.memorization : null,
+          revision: hasRev && isAssigned(s.revision) ? s.revision : null,
+          score: s.score ?? suggestScore({ attendance: s.attendance, mem: hasMem ? s.memorization : null, rev: hasRev ? s.revision : null, weekWorship, commitment: s.commitment }),
+        }
       : { id: newId, studentId, date: s.date, attendance: s.attendance, notes: s.notes };
     setSaving(true);
     try {
@@ -128,7 +135,7 @@ export default function SessionForm({ studentId, initial, onSaved, onCancel }: P
         </div>
         {exists && <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-[12px] text-amber-700">يوجد سجل لهذا الطالب في نفس التاريخ، وسيتم استبداله عند الحفظ.</p>}
         <p className="mt-3 text-[12px] text-navy-400">
-          زر الآلة الحاسبة يقترح العلامة: حضور 10% + حفظ 30% + مراجعة 30% + عبادات 20% (علامة أسبوع العبادات الحالي: {pct(weekWorship)}) + تقييم 10%.
+          زر الآلة الحاسبة يقترح العلامة: حضور 10% + إنجاز القرآن 60% (بين الحفظ والمراجعة المطلوبة فقط) + العبادات والالتزام 20% (عبادات الأسبوع الحالي: {pct(weekWorship)}) + جودة التسميع 10% (موزونة بعدد الصفحات).
         </p>
       </section>
 

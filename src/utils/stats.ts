@@ -1,5 +1,6 @@
-import type { CommitmentLevel, DailyWorship, SessionRecord } from '@/types';
+import type { CommitmentLevel, DailyWorship, MemorizationEntry, RevisionEntry, SessionRecord } from '@/types';
 import { round1 } from './format';
+import { isAssigned } from './quran';
 import { dailyWorshipScore } from './worship';
 
 const attended = (s: SessionRecord) => s.attendance === 'present' || s.attendance === 'late';
@@ -91,21 +92,50 @@ export function studentSessions(all: SessionRecord[], studentId: string) {
   return all.filter((s) => s.studentId === studentId).sort((a, b) => b.date.localeCompare(a.date));
 }
 
-/** معادلة العلامة المقترحة: حضور 10% + حفظ 30% + مراجعة 30% + عبادات 20% + تقييم 10% */
+type Part = Pick<MemorizationEntry, 'requiredPages' | 'completedPages' | 'completion' | 'grade' | 'recited'> | Pick<RevisionEntry, 'requiredPages' | 'completedPages' | 'completion' | 'grade' | 'revised'>;
+
+export const commitmentScore: Record<CommitmentLevel, number> = { excellent: 100, very_good: 85, good: 70, needs_work: 50 };
+
+/**
+ * جودة التسميع لليوم (من 100): متوسط جودة الحفظ والمراجعة موزون بعدد الصفحات المسمّعة فعلًا،
+ * فـ 3 صفحات بـ100 و20 صفحة بـ90 = (3×100 + 20×90) ÷ 23 = 91.3 (مش 95 بالمتوسط العادي).
+ * إذا ما في عدد صفحات مسمّعة (الجودة بدون صفحات) يُؤخذ متوسط عادي. undefined = ما سمّع شيء.
+ */
+export function recitationQuality(parts: Part[]): number | undefined {
+  const withGrade = parts.filter((p) => typeof p.grade === 'number');
+  const recited = withGrade.filter((p) => p.completedPages > 0);
+  if (recited.length) return round1(recited.reduce((a, p) => a + p.grade * p.completedPages, 0) / recited.reduce((a, p) => a + p.completedPages, 0));
+  const graded = withGrade.filter((p) => ('recited' in p ? p.recited : p.revised)?.trim());
+  return graded.length ? round1(graded.reduce((a, p) => a + p.grade, 0) / graded.length) : undefined;
+}
+
+/**
+ * المعادلة الموحّدة لعلامة اليوم (من 100) — نفسها بالتسجيل اليومي وصفحة الطالب والاستيراد:
+ *   حضور 10% (المتأخر 60 من 100)
+ *   + إنجاز القرآن 60%: المسمّع ÷ المطلوب، موزّع على الأجزاء المطلوبة فعلًا فقط
+ *     (حفظ ومراجعة ← 30% لكل واحد، حفظ بس ← الـ60% كلها للحفظ؛ الجزء غير المطلوب لا يُحسب صفرًا)
+ *   + العبادات والالتزام 20%: عبادات الأسبوع 15% + الالتزام والسلوك بالدوام 5%
+ *     (إذا الالتزام غير مُدخل تاخذ العبادات الـ20% كلها)
+ *   + جودة التسميع 10%: متوسط جودة الحفظ والمراجعة موزون بعدد الصفحات (recitationQuality).
+ * ما لا يوجد له قيمة (لا حفظ ولا مراجعة مطلوبة، أو ما سمّع شيء) يخرج من الحساب ويتوزّع وزنه على الباقي.
+ */
 export function suggestScore(input: {
   attendance: SessionRecord['attendance'];
-  memGrade?: number;
-  revGrade?: number;
+  mem?: Part | null;
+  rev?: Part | null;
   weekWorship?: number; // علامة أسبوع العبادات (سبت-خميس) المرتبط بهذا اليوم، من 100
-  evaluation?: number; // 0..100
+  commitment?: CommitmentLevel;
 }) {
   if (input.attendance === 'absent' || input.attendance === 'excused') return 0;
-  const att = input.attendance === 'late' ? 6 : 10;
-  const mem = input.memGrade ?? input.revGrade ?? 0;
-  const rev = input.revGrade ?? input.memGrade ?? 0;
-  const w = input.weekWorship ?? 0;
-  const ev = input.evaluation ?? 90;
-  return Math.round(att + mem * 0.3 + rev * 0.3 + w * 0.2 + ev * 0.1);
+  const parts = [input.mem, input.rev].filter((p): p is Part => isAssigned(p));
+  const items: [weight: number, value: number][] = [[10, input.attendance === 'late' ? 60 : 100]];
+  parts.forEach((p) => items.push([60 / parts.length, p.completion]));
+  if (input.commitment) items.push([15, input.weekWorship ?? 0], [5, commitmentScore[input.commitment]]);
+  else items.push([20, input.weekWorship ?? 0]);
+  const quality = recitationQuality(parts);
+  if (quality !== undefined) items.push([10, quality]);
+  const total = items.reduce((a, [w]) => a + w, 0);
+  return Math.round(items.reduce((a, [w, v]) => a + w * v, 0) / total);
 }
 
 /** هل الصورة ما زالت ضمن مدة العرض في السلايد شو؟ */
