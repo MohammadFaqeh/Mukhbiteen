@@ -74,7 +74,7 @@ export function dailyWorshipScore(d: DailyWorship): number {
   return round1(clamp(prayerPts + adhkarPts + duhaPts + qiyamPts + witrPts + rawatibPts + parentsPts + wirdPts, 0, 100));
 }
 
-/** علامة الأسبوع: متوسط الأيام المسجَّلة + مكافأة صغيرة إن تصدّق مرة خلال الأسبوع */
+/** علامة الأسبوع: متوسط الأيام المسجَّلة + علامة الصدقة إن تصدّق مرة واحدة على الأقل خلال الأسبوع (علامة اليوم لا تشمل الصدقة، فلا خصم عن الأيام الأخرى) */
 export function weekWorshipScore(days: DailyWorship[]): number {
   if (!days.length) return 0;
   const avg = days.reduce((a, d) => a + dailyWorshipScore(d), 0) / days.length;

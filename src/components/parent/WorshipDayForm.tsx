@@ -108,6 +108,9 @@ export default function WorshipDayForm({ studentId, worship }: { studentId: stri
   const future = date > TODAY;
   const dayLabel = WEEKDAY_LABELS[dates.indexOf(date)] ?? '';
   const wird = wirdPages(d);
+  // صدقة مسجّلة بيوم ثاني من نفس الأسبوع — علامتها محسوبة للأسبوع كامل
+  const charityIdx = dates.findIndex((x) => x !== date && saved.get(x)?.charity);
+  const charityDay = charityIdx >= 0 ? WEEKDAY_LABELS[charityIdx] : '';
 
   const goWeek = (n: number) => {
     const ws = addDays(weekStart, 7 * n);
@@ -249,7 +252,10 @@ export default function WorshipDayForm({ studentId, worship }: { studentId: stri
             </div>
           </Block>
 
-          <Block title="الصدقة">
+          <Block title="الصدقة" hint="(تُحسب مرة واحدة في الأسبوع، ولا يُخصم عن الأيام التي لم يتصدّق فيها)">
+            {charityDay && (
+              <p className="rounded-xl bg-emerald-50 px-3 py-2 text-[13px] text-emerald-800">تم تسجيل صدقة هذا الأسبوع يوم {charityDay} ✓</p>
+            )}
             <div className="flex gap-2">
               <Choice on={d.charity} onClick={() => set('charity', true)}>
                 تصدّق اليوم
