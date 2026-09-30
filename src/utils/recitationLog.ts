@@ -26,6 +26,8 @@ export type LogField =
   | 'commitment'
   | 'notes'
   | 'nextMem'
+  | 'nextMemPages'
+  | 'nextRevPages'
   | 'nextRev'
   | 'nextExtra'
   | 'memToday'
@@ -48,6 +50,8 @@ export interface LogEntry {
   commitment?: CommitmentLevel;
   notes?: string;
   nextMem?: string;
+  nextMemPages?: number; // عدد صفحات المطلوب القادم — للمشرف فقط
+  nextRevPages?: number;
   nextRev?: string;
   nextExtra?: string;
   memToday?: string; // المطلوب اليوم (نص) — يُحفظ وصفًا للمطلوب بسجل اليوم
@@ -87,7 +91,11 @@ export function classifyHeader(raw: string): LogField | null {
   const mem = h.includes('حفظ');
   const rev = h.includes('مراجع');
   // "المطلوب القادم: ..." يُفحص أولًا لأنه فيه كمان "مطلوب" و"حفظ"
-  if (h.includes('قادم')) return h.includes('مهمه') ? 'nextExtra' : mem ? 'nextMem' : rev ? 'nextRev' : null;
+  if (h.includes('قادم')) {
+    if (h.includes('مهمه')) return 'nextExtra';
+    const pages = h.includes('صفحات');
+    return mem ? (pages ? 'nextMemPages' : 'nextMem') : rev ? (pages ? 'nextRevPages' : 'nextRev') : null;
+  }
   if (h.includes('اليوم')) return mem ? 'memToday' : rev ? 'revToday' : null;
   if (h.includes('جوده')) return mem ? 'memGrade' : rev ? 'revGrade' : 'grade';
   if (h.includes('حضور')) return 'attendance';
@@ -357,6 +365,8 @@ function assign(X: Xlsx, e: LogEntry, f: LogField, c: CellObject | undefined, is
 function hasData(e: LogEntry) {
   return (
     [e.attendance, e.memRequired, e.memCompleted, e.memGrade, e.revRequired, e.revCompleted, e.revGrade, e.grade, e.commitment].some((v) => v !== undefined) ||
+    e.nextMemPages !== undefined ||
+    e.nextRevPages !== undefined ||
     !!(e.memText || e.revText || e.notes || e.nextMem || e.nextRev || e.nextExtra)
   );
 }

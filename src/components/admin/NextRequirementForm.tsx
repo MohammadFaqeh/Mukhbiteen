@@ -34,6 +34,14 @@ export default function NextRequirementForm({ studentId }: { studentId: string }
         <Field label="المراجعة المطلوبة">
           <input className="input" value={r.revision} onChange={(e) => set('revision', e.target.value)} />
         </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="صفحات الحفظ (للمشرف فقط)">
+            <input type="number" min={0} className="input" value={r.memorizationPages ?? ''} onChange={(e) => set('memorizationPages', e.target.value === '' ? undefined : Number(e.target.value))} />
+          </Field>
+          <Field label="صفحات المراجعة (للمشرف فقط)">
+            <input type="number" min={0} className="input" value={r.revisionPages ?? ''} onChange={(e) => set('revisionPages', e.target.value === '' ? undefined : Number(e.target.value))} />
+          </Field>
+        </div>
         <Field label="مهمة إضافية">
           <input className="input" value={r.extraTask ?? ''} onChange={(e) => set('extraTask', e.target.value)} />
         </Field>

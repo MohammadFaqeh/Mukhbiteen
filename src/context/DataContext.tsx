@@ -195,7 +195,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const saveRequirement = useCallback(async (r: NextRequirement) => {
-    const { error: err } = await supabase.from('next_requirements').upsert(requirementToRow(r), { onConflict: 'student_id' });
+    const row: Record<string, unknown> = requirementToRow(r);
+    let { error: err } = await supabase.from('next_requirements').upsert(row, { onConflict: 'student_id' });
+    // قاعدة بيانات قديمة بدون أعمدة عدد الصفحات (supabase/schema.sql) — نحفظ المطلوب بدونها بدل ما يفشل الحفظ
+    if (err && /(memorization|revision)_pages/.test(err.message)) {
+      console.warn('أعمدة memorization_pages/revision_pages غير موجودة بجدول next_requirements — شغّل تعديل schema.sql');
+      delete row.memorization_pages;
+      delete row.revision_pages;
+      ({ error: err } = await supabase.from('next_requirements').upsert(row, { onConflict: 'student_id' }));
+    }
     if (err) throw new Error(err.message);
     setData((d) => ({
       ...d,

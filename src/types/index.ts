@@ -92,6 +92,9 @@ export interface NextRequirement {
   date: string; // تاريخ الدوام القادم
   memorization: string;
   revision: string;
+  /** عدد صفحات المطلوب — للمشرف فقط (لا يظهر لولي الأمر)، يعبّي خانة العدد بملف الدوام القادم */
+  memorizationPages?: number;
+  revisionPages?: number;
   extraTask?: string;
   notes?: string;
   updatedAt: string;

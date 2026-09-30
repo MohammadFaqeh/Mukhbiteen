@@ -34,7 +34,9 @@ const COLS = [
   ['commit', 'الالتزام والسلوك بالدوام', 14, 'FFF7EFE0'],
   ['notes', 'ملاحظات (تظهر لولي الأمر)', 28, 'FFF7EFE0'],
   ['nextMem', 'المطلوب القادم: حفظ', 18, 'FFF6E6EA'],
+  ['nextMemPages', 'المطلوب القادم: حفظ (صفحات) — للمشرف', 12, 'FFF6E6EA'],
   ['nextRev', 'المطلوب القادم: مراجعة', 18, 'FFF6E6EA'],
+  ['nextRevPages', 'المطلوب القادم: مراجعة (صفحات) — للمشرف', 12, 'FFF6E6EA'],
   ['nextExtra', 'المطلوب القادم: مهمة إضافية', 18, 'FFF6E6EA'],
   ['check', 'تنبيه (تلقائي)', 28, 'FFEEEEEE'],
 ] as const;
@@ -133,7 +135,7 @@ async function buildAndDownload(rows: Row[], fileName: string) {
   const range = (col: string) => `${col}3:${col}${last}`;
   dv.add(range(L.att), { type: 'list', allowBlank: true, formulae: ['"حاضر,متأخر,غائب,غائب بعذر"'], showErrorMessage: true, errorTitle: 'قيمة غير معروفة', error: 'اختر: حاضر، متأخر، غائب، غائب بعذر' });
   dv.add(range(L.commit), { type: 'list', allowBlank: true, formulae: ['"ممتاز,جيد جدًا,جيد,يحتاج متابعة"'], showErrorMessage: true, errorTitle: 'قيمة غير معروفة', error: 'اختر: ممتاز، جيد جدًا، جيد، يحتاج متابعة' });
-  for (const c of [L.memReq, L.memDone, L.revReq, L.revDone])
+  for (const c of [L.memReq, L.memDone, L.revReq, L.revDone, L.nextMemPages, L.nextRevPages])
     dv.add(range(c), { type: 'decimal', operator: 'between', allowBlank: true, formulae: [0, 60], showErrorMessage: true, errorTitle: 'رقم غير صحيح', error: 'عدد الصفحات رقم بين 0 و 60. اتركه فاضي إذا ما عليه.' });
   for (const c of [L.memGrade, L.revGrade])
     dv.add(range(c), { type: 'decimal', operator: 'between', allowBlank: true, formulae: [0, 100], showErrorMessage: true, errorTitle: 'رقم غير صحيح', error: 'الجودة رقم من 0 إلى 100' });
@@ -159,7 +161,7 @@ async function buildAndDownload(rows: Row[], fileName: string) {
 
 /**
  * ملف دوام يوم واحد: المحفوظ لهذا اليوم إن وُجد، وإلا حاضر + "المطلوب اليوم" = المطلوب القادم المحفوظ للطالب
- * (إذا تاريخه هذا اليوم أو قبله). عدد الصفحات المطلوبة يُحسب منه إذا كان أرقام صفحات (417-418)، وإلا من آخر دوام.
+ * (إذا تاريخه هذا اليوم أو قبله). عدد الصفحات المطلوبة: عدده المحفوظ، وإلا من أرقام الصفحات (417-418)، وإلا من آخر دوام.
  */
 export function downloadSessionFile(date: string, students: Student[], sessions: SessionRecord[], requirements: NextRequirement[]) {
   const list = students.filter((s) => s.active || sessions.some((x) => x.id === `${s.id}-${date}`)).sort((a, b) => a.name.localeCompare(b.name, 'ar'));
@@ -172,8 +174,9 @@ export function downloadSessionFile(date: string, students: Student[], sessions:
     return sessionRow(saved, date, st.name, {
       mem: req?.memorization,
       rev: req?.revision,
-      memReq: (req?.memorization && parsePageRanges(req.memorization)?.pages) || lastMem,
-      revReq: (req?.revision && parsePageRanges(req.revision)?.pages) || lastRev,
+      // العدد: المكتوب بخانة "المطلوب القادم (صفحات)"، وإلا من أرقام الصفحات بالنص، وإلا من آخر دوام
+      memReq: req?.memorizationPages || (req?.memorization && parsePageRanges(req.memorization)?.pages) || lastMem,
+      revReq: req?.revisionPages || (req?.revision && parsePageRanges(req.revision)?.pages) || lastRev,
     });
   });
   return buildAndDownload(rows, `دوام-${date}.xlsx`);

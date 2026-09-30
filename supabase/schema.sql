@@ -70,10 +70,16 @@ create table if not exists public.next_requirements (
   date date,
   memorization text,
   revision text,
+  memorization_pages numeric, -- عدد صفحات المطلوب: للمشرف فقط، لا يظهر لولي الأمر
+  revision_pages numeric,
   extra_task text,
   notes text,
   updated_at timestamptz not null default now()
 );
+
+-- للقواعد المنشأة قبل إضافة أعمدة عدد الصفحات
+alter table public.next_requirements add column if not exists memorization_pages numeric;
+alter table public.next_requirements add column if not exists revision_pages numeric;
 
 create table if not exists public.activities (
   id text primary key,
