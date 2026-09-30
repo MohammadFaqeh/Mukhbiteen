@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+import { HandHeart } from 'lucide-react';
 import { useParentStudent } from '@/hooks/useParentStudent';
 import StudentHero from '@/components/parent/StudentHero';
 import HonorBoardCard from '@/components/parent/HonorBoardCard';
@@ -29,10 +31,9 @@ export default function ParentHome() {
 
       <HonorBoardCard />
 
-      <div className="grid gap-4 sm:gap-5 lg:grid-cols-12">
-        <NextSessionTicket req={requirement} className="lg:col-span-7 xl:col-span-8" />
-        <Slideshow items={live.length ? live : activities.slice(0, 3)} className="min-h-[280px] lg:col-span-5 xl:col-span-4" />
-      </div>
+      <NextSessionTicket req={requirement} />
+
+      <Slideshow items={live.length ? live : activities.slice(0, 3)} className="min-h-[300px] sm:min-h-[420px] lg:min-h-[520px]" />
 
       <StatsRow stats={stats} month={month} />
 
@@ -40,8 +41,11 @@ export default function ParentHome() {
         <div className="md:col-span-2 xl:col-span-7">
           <TrendCard stats={stats} />
         </div>
-        <div className="md:col-span-2 xl:col-span-5">
+        <div className="flex flex-col gap-2 md:col-span-2 xl:col-span-5">
           <WorshipCard weekDays={weekDays} monthAverage={stats.worship} />
+          <Link to="/parent/worship" className="btn-soft justify-center">
+            <HandHeart className="h-4 w-4" /> عبّي عبادات اليوم
+          </Link>
         </div>
       </div>
 

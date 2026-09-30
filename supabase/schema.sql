@@ -192,6 +192,14 @@ drop policy if exists "admin full access daily_worship" on public.daily_worship;
 create policy "admin full access daily_worship" on public.daily_worship for all using (public.is_admin()) with check (public.is_admin());
 drop policy if exists "parent reads own daily_worship" on public.daily_worship;
 create policy "parent reads own daily_worship" on public.daily_worship for select using (student_id = (select student_id from public.profiles where id = auth.uid()));
+-- ولي الأمر يعبّي جدول العبادات لابنه فقط (والمعرّف لازم يطابق الطالب والتاريخ)
+drop policy if exists "parent inserts own daily_worship" on public.daily_worship;
+create policy "parent inserts own daily_worship" on public.daily_worship for insert
+  with check (student_id = (select student_id from public.profiles where id = auth.uid()) and id = student_id || '-' || date::text);
+drop policy if exists "parent updates own daily_worship" on public.daily_worship;
+create policy "parent updates own daily_worship" on public.daily_worship for update
+  using (student_id = (select student_id from public.profiles where id = auth.uid()))
+  with check (student_id = (select student_id from public.profiles where id = auth.uid()) and id = student_id || '-' || date::text);
 
 drop policy if exists "admin full access next_requirements" on public.next_requirements;
 create policy "admin full access next_requirements" on public.next_requirements for all using (public.is_admin()) with check (public.is_admin());

@@ -41,15 +41,15 @@ export default function Slideshow({ items, className }: { items: Activity[]; cla
         />
       ))}
       <div className="absolute inset-0 bg-gradient-to-t from-navy-950/85 via-navy-950/20 to-transparent" />
-      <div className="relative flex h-full flex-col justify-end p-5 text-white">
+      <div className="relative flex h-full flex-col justify-end p-5 text-white sm:p-8">
         <span className="mb-2 inline-flex w-fit items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-[11px] backdrop-blur">
           <CalendarDays className="h-3.5 w-3.5" />
           {formatDate(items[i].date)}
         </span>
-        <h3 key={items[i].id} className="animate-fade-in text-[19px] font-bold">
+        <h3 key={items[i].id} className="animate-fade-in text-[19px] font-bold sm:text-[26px] lg:text-[30px]">
           {items[i].title}
         </h3>
-        <p className="mt-1 line-clamp-2 text-[13px] text-white/80">{items[i].description}</p>
+        <p className="mt-1 line-clamp-2 max-w-3xl text-[13px] text-white/80 sm:text-[15px]">{items[i].description}</p>
         <div className="mt-4 flex items-center justify-between">
           <div className="flex gap-1.5">
             {items.map((a, k) => (

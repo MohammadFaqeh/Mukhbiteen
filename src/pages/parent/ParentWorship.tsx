@@ -3,13 +3,14 @@ import { useParentStudent } from '@/hooks/useParentStudent';
 import PageHeader from '@/components/shared/PageHeader';
 import WorshipCard from '@/components/parent/WorshipCard';
 import WorshipWeekGrid from '@/components/shared/WorshipWeekGrid';
+import WorshipDayForm from '@/components/parent/WorshipDayForm';
 import Select from '@/components/ui/Select';
 import { monthKey } from '@/utils/stats';
 import { dailyWorshipScore, weekDates, weekStartOf, weekWorshipScore } from '@/utils/worship';
 import { formatDate, formatMonthKey, pct } from '@/utils/format';
 
 export default function ParentWorship() {
-  const { worship, stats } = useParentStudent();
+  const { student, worship, stats } = useParentStudent();
 
   const weeks = useMemo(() => [...new Set(worship.map((d) => weekStartOf(d.date)))].sort().reverse(), [worship]);
   const [weekStart, setWeekStart] = useState(weeks[0] ?? '');
@@ -25,19 +26,23 @@ export default function ParentWorship() {
     return { m, v };
   });
 
-  if (!stats) return null;
+  if (!stats || !student) return null;
 
   return (
     <div>
       <PageHeader
         title="العبادات"
-        subtitle="جدول العبادات الأسبوعي (من السبت إلى الخميس) – يوم الجمعة هو يوم الدوام بالمركز"
+        subtitle="عبّي كل يوم لحال (من السبت إلى الخميس) – يوم الجمعة هو يوم الدوام بالمركز"
         actions={
           weeks.length > 0 && (
             <Select value={weekStart || weeks[0]} onChange={setWeekStart} options={weeks.map((w) => ({ value: w, label: `أسبوع ${formatDate(w)}` }))} className="w-52" ariaLabel="اختيار الأسبوع" />
           )
         }
       />
+      <div className="mb-4">
+        <WorshipDayForm studentId={student.id} worship={worship} />
+      </div>
+
       <div className="grid gap-4 lg:grid-cols-12">
         <div className="lg:col-span-4">
           <WorshipCard weekDays={weekDays} monthAverage={stats.worship} />
@@ -64,15 +69,15 @@ export default function ParentWorship() {
         </section>
       </div>
 
-      <section className="card mt-4 p-5">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <h3 className="section-title">جدول الأسبوع</h3>
+      <details className="card group mt-4 p-5">
+        <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2">
+          <h3 className="section-title">عرض الأسبوع كامل (جدول)</h3>
           <span className="text-[13px] text-navy-500">
-            علامة الأسبوع: <b className="text-navy-900">{pct(weekScore)}</b>
+            علامة الأسبوع: <b className="text-navy-900">{pct(weekScore)}</b> <span className="text-navy-300 group-open:hidden">▾</span>
           </span>
-        </div>
-        {dates.length ? <WorshipWeekGrid dates={dates} days={daysMap} /> : <p className="text-navy-400">لا توجد بيانات بعد.</p>}
-      </section>
+        </summary>
+        <div className="mt-4">{dates.length ? <WorshipWeekGrid dates={dates} days={daysMap} /> : <p className="text-navy-400">لا توجد بيانات بعد.</p>}</div>
+      </details>
     </div>
   );
 }
