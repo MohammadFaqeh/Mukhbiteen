@@ -34,10 +34,13 @@ interface Row {
   showDetails?: boolean; // سطر وصف ما سُمّع حفظًا ومراجعةً
 }
 
-/** الحفظ/المراجعة المطلوبة فعلًا بالصف — المفعّل بمطلوب 0 ومسمّع 0 وبلا وصف يُعتبر غير مطلوب (لا يُحفظ ولا يُحسب صفرًا) */
-function partsOf(x: Row) {
-  const mem = { required: '', recited: x.memRecited ?? '', requiredPages: x.memRequiredPages, completedPages: x.memCompletedPages, completion: completionPercent(x.memRequiredPages, x.memCompletedPages), grade: x.memGrade ?? 0 };
-  const rev = { required: '', revised: x.revRevised ?? '', requiredPages: x.revRequiredPages, completedPages: x.revCompletedPages, completion: completionPercent(x.revRequiredPages, x.revCompletedPages), grade: x.revGrade ?? 0 };
+/**
+ * الحفظ/المراجعة المطلوبة فعلًا بالصف — المفعّل بمطلوب 0 ومسمّع 0 وبلا وصف ولا مطلوب مكتوب يُعتبر غير مطلوب.
+ * required = المطلوب المكتوب للطالب (المطلوب القادم المحفوظ) — يخلّي الجزء مطلوبًا حتى لو ما سمّع شيء.
+ */
+function partsOf(x: Row, req?: { memorization?: string; revision?: string }) {
+  const mem = { required: req?.memorization ?? '', recited: x.memRecited ?? '', requiredPages: x.memRequiredPages, completedPages: x.memCompletedPages, completion: completionPercent(x.memRequiredPages, x.memCompletedPages), grade: x.memGrade ?? 0 };
+  const rev = { required: req?.revision ?? '', revised: x.revRevised ?? '', requiredPages: x.revRequiredPages, completedPages: x.revCompletedPages, completion: completionPercent(x.revRequiredPages, x.revCompletedPages), grade: x.revGrade ?? 0 };
   return { mem: x.hasMem && isAssigned(mem) ? mem : null, rev: x.hasRev && isAssigned(rev) ? rev : null };
 }
 
@@ -148,7 +151,7 @@ export default function AdminAttendance() {
         ...x,
         score:
           x.attendance === 'present' || x.attendance === 'late'
-            ? suggestScore({ attendance: x.attendance, ...partsOf(x), weekWorship: weekWorshipByStudent.get(x.studentId), commitment: x.commitment })
+            ? suggestScore({ attendance: x.attendance, ...partsOf(x, getRequirement(x.studentId)), weekWorship: weekWorshipByStudent.get(x.studentId), commitment: x.commitment })
             : undefined,
       })),
     );
@@ -161,7 +164,7 @@ export default function AdminAttendance() {
       const prev = sessions.find((s) => s.id === id);
       const req = getRequirement(x.studentId);
       if (!attended) return { id, studentId: x.studentId, date, attendance: x.attendance, notes: x.notes || undefined };
-      const { mem, rev } = partsOf(x);
+      const { mem, rev } = partsOf(x, req);
       return {
         id,
         studentId: x.studentId,

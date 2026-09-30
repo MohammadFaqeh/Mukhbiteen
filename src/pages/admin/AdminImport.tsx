@@ -53,8 +53,8 @@ function toSession(e: LogEntry, studentId: string, prev: SessionRecord | undefin
   const notes = e.notes ?? prev?.notes;
   if (attendance !== 'present' && attendance !== 'late') return { id, studentId, date: e.date, attendance, notes };
 
-  const hasMem = (e.memRequired ?? 0) > 0 || (e.memCompleted ?? 0) > 0 || !!e.memText;
-  const hasRev = (e.revRequired ?? 0) > 0 || (e.revCompleted ?? 0) > 0 || !!e.revText;
+  const hasMem = (e.memRequired ?? 0) > 0 || (e.memCompleted ?? 0) > 0 || !!e.memText || !!e.memToday;
+  const hasRev = (e.revRequired ?? 0) > 0 || (e.revCompleted ?? 0) > 0 || !!e.revText || !!e.revToday;
   const memReq = e.memRequired ?? 0;
   const memDone = e.memCompleted ?? 0;
   const revReq = e.revRequired ?? 0;

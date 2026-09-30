@@ -27,11 +27,12 @@ export const completionStatusTone: Record<CompletionStatus, 'green' | 'gold' | '
 };
 
 /**
- * جزء (حفظ/مراجعة) مطلوب فعلًا من الطالب؟ الجزء بمطلوب 0 ومسمّع 0 وبلا وصف = غير مطلوب أصلًا،
- * فلا يظهر ولا يدخل بأي حساب (بدل ما ينحسب له 0% ظلمًا).
+ * جزء (حفظ/مراجعة) مطلوب فعلًا من الطالب؟ مطلوب إذا فيه عدد صفحات مطلوبة، أو مكتوب شو المطلوب (نص)،
+ * أو سمّع شيء. الجزء الفاضي من كل هذا = غير مطلوب أصلًا، فلا يظهر ولا يدخل بأي حساب (بدل ما ينحسب له 0% ظلمًا).
+ * والمطلوب المكتوب نصًا بلا تسميع يبقى محفوظًا ويُحسب إنجازه 0 — عشان يضل معروف شو كان مطلوب منه.
  */
-export function isAssigned(p: { requiredPages?: number; completedPages?: number; recited?: string; revised?: string } | null | undefined) {
-  return !!p && ((p.requiredPages ?? 0) > 0 || (p.completedPages ?? 0) > 0 || !!(p.recited ?? p.revised ?? '').trim());
+export function isAssigned(p: { required?: string; requiredPages?: number; completedPages?: number; recited?: string; revised?: string } | null | undefined) {
+  return !!p && ((p.requiredPages ?? 0) > 0 || (p.completedPages ?? 0) > 0 || !!(p.required ?? '').trim() || !!(p.recited ?? p.revised ?? '').trim());
 }
 
 /**
