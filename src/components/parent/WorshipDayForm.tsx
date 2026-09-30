@@ -256,18 +256,20 @@ export default function WorshipDayForm({ studentId, worship }: { studentId: stri
             </div>
           </Block>
 
-          <Block title="رضا الوالدين عنه اليوم">
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {[
-                [100, 'راضيين تمامًا'],
-                [75, 'راضيين'],
-                [50, 'متوسط'],
-                [25, 'مش راضيين'],
-              ].map(([v, label]) => (
-                <Choice key={v} on={d.parentsSatisfaction === v} tone={(v as number) >= 75 ? 'green' : (v as number) >= 50 ? 'amber' : 'red'} onClick={() => set('parentsSatisfaction', v as number)}>
-                  {label}
-                </Choice>
-              ))}
+          <Block title="رضا الوالدين عنه اليوم" hint="(علامة من 100)">
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                max={100}
+                className="input w-28 text-center text-[20px] font-extrabold"
+                value={d.parentsSatisfaction ?? ''}
+                onChange={(e) => set('parentsSatisfaction', e.target.value === '' ? undefined : Math.max(0, Math.min(100, Math.round(Number(e.target.value)) || 0)))}
+                placeholder="مثلًا 90"
+                aria-label="رضا الوالدين من 100"
+              />
+              <span className="text-[16px] font-bold text-navy-400">/ 100</span>
             </div>
           </Block>
 
