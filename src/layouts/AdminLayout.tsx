@@ -1,5 +1,6 @@
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import ErrorBoundary from '@/components/shared/ErrorBoundary';
+import StudentQuickFind from '@/components/admin/StudentQuickFind';
 import { CalendarPlus, FileSpreadsheet, FileText, GalleryHorizontalEnd, LayoutDashboard, Users } from 'lucide-react';
 import Sidebar, { type NavItem } from './Sidebar';
 import BrandBackground from '@/components/brand/BrandBackground';
@@ -53,6 +54,7 @@ export default function AdminLayout() {
                 </p>
               </div>
             </div>
+            <StudentQuickFind />
             <div className="flex items-center gap-3">
               <div className="text-left leading-tight">
                 <p className="text-[13px] font-bold text-navy-800">{user?.displayName}</p>

@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BookOpen, Calculator, Check, CheckCheck, ListPlus, Loader2, MessageSquarePlus, RotateCcw, Save, Trash2 } from 'lucide-react';
+import { BookOpen, Calculator, Check, CheckCheck, ExternalLink, ListPlus, Loader2, MessageSquarePlus, RotateCcw, Save, Search, Trash2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { normalizeArabic } from '@/utils/recitationLog';
 import { useData } from '@/context/DataContext';
 import { useToast } from '@/context/ToastContext';
 import { useConfirmDelete } from '@/hooks/useConfirmDelete';
@@ -74,6 +76,7 @@ export default function AdminAttendance() {
   const savedForDate = sessions.filter((s) => s.date === date);
   const [rows, setRows] = useState<Row[]>(draft?.rows ?? []);
   const skipNextPopulate = useRef(!!draft);
+  const [q, setQ] = useState(''); // فلترة العرض فقط — الحفظ يشمل كل الطلاب
 
   /** علامة أسبوع العبادات (سبت-خميس) المرتبط بهذا التاريخ، لكل طالب */
   const weekWorshipByStudent = useMemo(() => {
@@ -221,7 +224,11 @@ export default function AdminAttendance() {
         }
       />
 
-      <div className="mb-3 flex flex-wrap gap-2 text-[12px]">
+      <div className="mb-3 flex flex-wrap items-center gap-2 text-[12px]">
+        <div className="relative ml-auto w-full max-w-xs sm:w-64">
+          <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-navy-300" />
+          <input className="input input-sm w-full pr-9" placeholder="ابحث عن طالب بهالصفحة…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="بحث عن طالب" />
+        </div>
         <span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700">حاضر {counts.present}</span>
         <span className="rounded-full bg-amber-50 px-3 py-1 text-amber-700">متأخر {counts.late}</span>
         <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-600">غائب بعذر {counts.excused}</span>
@@ -244,6 +251,7 @@ export default function AdminAttendance() {
           {rows.map((r) => {
             const st = students.find((s) => s.id === r.studentId);
             if (!st) return null; // طالب انحذف وهو لسا بمسودة محفوظة
+            if (q.trim() && !normalizeArabic(st.name).includes(normalizeArabic(q))) return null;
             const attended = r.attendance === 'present' || r.attendance === 'late';
             return (
               <li key={r.studentId} className={cx('px-4 py-3 transition', !attended && 'bg-paper/60')}>
@@ -251,6 +259,14 @@ export default function AdminAttendance() {
                   <div className="col-span-2 flex items-center gap-3 md:col-span-4 2xl:col-span-1">
                     <Avatar name={st.name} src={st.photo} size={40} />
                     <span className="truncate text-[14px] font-bold text-navy-900">{st.name}</span>
+                    <Link
+                      to={`/admin/students/${st.id}?tab=sessions${savedForDate.some((s) => s.studentId === st.id) ? `&date=${date}` : ''}`}
+                      className="shrink-0 rounded-lg p-1 text-navy-300 hover:bg-navy-50 hover:text-navy-700"
+                      title="فتح سجل دوام الطالب (يفتح تعديل هذا اليوم إذا كان محفوظ)"
+                      aria-label={`فتح سجل ${st.name}`}
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </Link>
                   </div>
                   <Cell label="الحضور" className="col-span-2 md:col-span-2 2xl:col-span-1">
                     <AttendancePicker size="sm" value={r.attendance} onChange={(v) => patch(r.studentId, { attendance: v })} />

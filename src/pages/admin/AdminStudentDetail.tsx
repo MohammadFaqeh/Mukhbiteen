@@ -107,7 +107,7 @@ export default function AdminStudentDetail() {
 
       <div key={tab} className="animate-fade-in">
         {tab === 'overview' && <Overview sessions={sessions} stats={stats} name={student.name} />}
-        {tab === 'sessions' && <SessionsTab studentId={id} sessions={sessions} name={student.name} />}
+        {tab === 'sessions' && <SessionsTab studentId={id} sessions={sessions} name={student.name} openDate={params.get('date')} />}
         {tab === 'memorization' && <QuranTab kind="mem" studentId={id} sessions={sessions} />}
         {tab === 'revision' && <QuranTab kind="rev" studentId={id} sessions={sessions} />}
         {tab === 'worship' && <WorshipTab studentId={id} />}
@@ -156,10 +156,11 @@ function Overview({ sessions, stats, name }: { sessions: SessionRecord[]; stats:
 }
 
 /* ---------------- الدوام ---------------- */
-function SessionsTab({ studentId, sessions, name }: { studentId: string; sessions: SessionRecord[]; name: string }) {
+function SessionsTab({ studentId, sessions, name, openDate }: { studentId: string; sessions: SessionRecord[]; name: string; openDate?: string | null }) {
   const { deleteSession, deleteSessions } = useData();
   const confirmDelete = useConfirmDelete();
-  const [editing, setEditing] = useState<SessionRecord | null>(null);
+  // ?date=YYYY-MM-DD (من زر "تعديل هذا اليوم" بصفحة تسجيل الدوام) يفتح تعديل ذاك اليوم مباشرة
+  const [editing, setEditing] = useState<SessionRecord | null>(() => sessions.find((s) => s.date === openDate) ?? null);
   const [adding, setAdding] = useState(false);
   const [view, setView] = useState<SessionRecord | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
