@@ -1,4 +1,5 @@
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import ErrorBoundary from '@/components/shared/ErrorBoundary';
 import { BookOpenText, CalendarCheck2, CalendarClock, FileText, HandHeart, House } from 'lucide-react';
 import Sidebar, { type NavItem } from './Sidebar';
 import BrandBackground from '@/components/brand/BrandBackground';
@@ -23,6 +24,7 @@ export default function ParentLayout() {
   const { logout } = useAuth();
   const { loading, error } = useData();
   const navigate = useNavigate();
+  const { pathname } = useLocation(); // مفتاح ErrorBoundary: التنقل لصفحة ثانية يرجّعها طبيعية
   const { student } = useParentStudent();
   const [collapsed, toggleCollapsed] = useSidebarCollapsed();
 
@@ -58,7 +60,9 @@ export default function ParentLayout() {
           ) : error ? (
             <p className="card-quiet p-10 text-center text-burgundy-600">تعذّر تحميل البيانات: {error}</p>
           ) : (
-            <Outlet />
+            <ErrorBoundary key={pathname}>
+              <Outlet />
+            </ErrorBoundary>
           )}
           <Footer />
         </div>

@@ -68,9 +68,10 @@ export default function AdminAttendance() {
   const { students, sessions, upsertSessions, deleteSessions, getRequirement, dailyWorship } = useData();
   const toast = useToast();
   const confirmDelete = useConfirmDelete();
-  const savedForDate = sessions.filter((s) => s.date === date);
   const draft = useRef(loadDraft()).current; // يُقرأ مرة واحدة فقط عند فتح الصفحة
   const [date, setDate] = useState(draft?.date ?? TODAY);
+  // بعد تعريف date: استخدامه قبل تعريفه كان يرمي خطأ ويبيّض الصفحة أول ما يكون في دوام محفوظ
+  const savedForDate = sessions.filter((s) => s.date === date);
   const [rows, setRows] = useState<Row[]>(draft?.rows ?? []);
   const skipNextPopulate = useRef(!!draft);
 
@@ -158,7 +159,8 @@ export default function AdminAttendance() {
 
   const [saving, setSaving] = useState(false);
   const saveAll = async () => {
-    const recs: SessionRecord[] = rows.map((x) => {
+    const exists = new Set(students.map((s) => s.id));
+    const recs: SessionRecord[] = rows.filter((x) => exists.has(x.studentId)).map((x) => {
       const id = `${x.studentId}-${date}`;
       const attended = x.attendance === 'present' || x.attendance === 'late';
       const prev = sessions.find((s) => s.id === id);
@@ -240,7 +242,8 @@ export default function AdminAttendance() {
         </div>
         <ul className="divide-y divide-navy-50">
           {rows.map((r) => {
-            const st = students.find((s) => s.id === r.studentId)!;
+            const st = students.find((s) => s.id === r.studentId);
+            if (!st) return null; // طالب انحذف وهو لسا بمسودة محفوظة
             const attended = r.attendance === 'present' || r.attendance === 'late';
             return (
               <li key={r.studentId} className={cx('px-4 py-3 transition', !attended && 'bg-paper/60')}>
