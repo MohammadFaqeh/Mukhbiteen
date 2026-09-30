@@ -136,7 +136,7 @@ async function buildAndDownload(rows: Row[], fileName: string) {
   dv.add(range(L.att), { type: 'list', allowBlank: true, formulae: ['"حاضر,متأخر,غائب,غائب بعذر"'], showErrorMessage: true, errorTitle: 'قيمة غير معروفة', error: 'اختر: حاضر، متأخر، غائب، غائب بعذر' });
   dv.add(range(L.commit), { type: 'list', allowBlank: true, formulae: ['"ممتاز,جيد جدًا,جيد,يحتاج متابعة"'], showErrorMessage: true, errorTitle: 'قيمة غير معروفة', error: 'اختر: ممتاز، جيد جدًا، جيد، يحتاج متابعة' });
   for (const c of [L.memReq, L.memDone, L.revReq, L.revDone, L.nextMemPages, L.nextRevPages])
-    dv.add(range(c), { type: 'decimal', operator: 'between', allowBlank: true, formulae: [0, 60], showErrorMessage: true, errorTitle: 'رقم غير صحيح', error: 'عدد الصفحات رقم بين 0 و 60. اتركه فاضي إذا ما عليه.' });
+    dv.add(range(c), { type: 'decimal', operator: 'between', allowBlank: true, formulae: [0, 604], showErrorMessage: true, errorTitle: 'رقم غير صحيح', error: 'عدد الصفحات رقم بين 0 و 604 (صفحات المصحف). اتركه فاضي إذا ما عليه.' });
   for (const c of [L.memGrade, L.revGrade])
     dv.add(range(c), { type: 'decimal', operator: 'between', allowBlank: true, formulae: [0, 100], showErrorMessage: true, errorTitle: 'رقم غير صحيح', error: 'الجودة رقم من 0 إلى 100' });
 
