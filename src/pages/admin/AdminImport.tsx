@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState, type ChangeEvent } from 'react';
-import { AlertTriangle, Download, FileSpreadsheet, Loader2, Trash2, UploadCloud } from 'lucide-react';
+import { AlertTriangle, CalendarPlus, Download, FileSpreadsheet, History, Loader2, Trash2, UploadCloud } from 'lucide-react';
 import { useData } from '@/context/DataContext';
 import { useToast } from '@/context/ToastContext';
 import PageHeader from '@/components/shared/PageHeader';
@@ -12,6 +12,7 @@ import { weekDates, weekStartOf, weekWorshipScore } from '@/utils/worship';
 import { PROJECT } from '@/data/project';
 import { TODAY } from '@/utils/today';
 import { cx, formatDate, formatLongDate } from '@/utils/format';
+import { downloadCumulativeFile, downloadSessionFile } from '@/utils/recitationFile';
 
 const NEW_STUDENT = '__new__';
 
@@ -39,9 +40,6 @@ function saveNameMap(pairs: [string, string][]) {
 }
 
 const pagesLabel = (n: number) => (n >= 3 && n <= 10 ? `${n} صفحات` : `${n} صفحة`);
-
-/** القالب الموحّد الجاهز للتعبئة (public/templates) */
-const TEMPLATE_URL = `${import.meta.env.BASE_URL}templates/recitation-log-template.xlsx`;
 
 /**
  * يحوّل صف الشيت لسجل دوام. الخلية الفاضية بالملف لا تمسح شيئًا: الالتزام والملاحظات والعلامة
@@ -102,10 +100,10 @@ function toSession(e: LogEntry, studentId: string, prev: SessionRecord | undefin
 function signature(s: SessionRecord) {
   const part = (p: MemorizationEntry | RevisionEntry | null | undefined, text: string | undefined) =>
     p ? [p.required, text ?? '', p.requiredPages, p.completedPages, p.completion, p.grade, p.notes || ''] : null;
+  // بدون العلامة: رفع السجل التراكمي كما هو ما لازم يعتبر الأيام القديمة "متغيّرة" لمجرد تغيّر معادلة الحساب
   return JSON.stringify([
     s.attendance,
     s.commitment ?? '',
-    s.score ?? null,
     s.notes || '',
     part(s.memorization, s.memorization?.recited),
     part(s.revision, s.revision?.revised),
@@ -139,6 +137,18 @@ export default function AdminImport() {
   const [defaultGrade, setDefaultGrade] = useState(90);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [fileDate, setFileDate] = useState(TODAY);
+  const [downloading, setDownloading] = useState<'' | 'session' | 'all'>('');
+  const download = async (kind: 'session' | 'all') => {
+    setDownloading(kind);
+    try {
+      await (kind === 'session' ? downloadSessionFile(fileDate, students, sessions) : downloadCumulativeFile(students, sessions));
+    } catch {
+      toast('تعذّر إنشاء الملف.');
+    } finally {
+      setDownloading('');
+    }
+  };
 
   const reset = () => {
     setLog(null);
@@ -294,14 +304,28 @@ export default function AdminImport() {
 
       {!log ? (
         <section className="card space-y-3 p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-emerald-50/60 px-4 py-3">
-            <div className="text-[13px] text-navy-700">
-              <p className="font-bold">القالب الموحّد (ملف واحد لكل السنة)</p>
-              <p className="text-[12px] text-navy-500">كل دوام أضف صفوف الطلاب تحت آخر صف، وارفع نفس الملف — الموقع يحفظ الجديد والمعدّل فقط، والأسابيع السابقة تبقى كما هي.</p>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-2 rounded-2xl bg-emerald-50/60 p-4">
+              <p className="flex items-center gap-2 text-[14px] font-bold text-navy-800">
+                <CalendarPlus className="h-4 w-4 text-emerald-700" /> ملف دوام جديد
+              </p>
+              <p className="text-[12px] text-navy-500">أسماء كل الطلاب جاهزة بتاريخ الدوام (حاضر، ومطلوب الصفحات من آخر دوام). عبّيه وارفعه هون.</p>
+              <div className="flex flex-wrap gap-2">
+                <input type="date" className="input w-44" value={fileDate} onChange={(e) => setFileDate(e.target.value)} aria-label="تاريخ الدوام" />
+                <button className="btn-ghost border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={() => download('session')} disabled={!!downloading || !fileDate}>
+                  {downloading === 'session' ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />} تنزيل Excel
+                </button>
+              </div>
             </div>
-            <a className="btn-ghost" href={TEMPLATE_URL} download="قالب-سجل-التسميع.xlsx">
-              <Download className="h-4 w-4" /> تنزيل القالب
-            </a>
+            <div className="space-y-2 rounded-2xl bg-navy-50/60 p-4">
+              <p className="flex items-center gap-2 text-[14px] font-bold text-navy-800">
+                <History className="h-4 w-4 text-navy-600" /> السجل التراكمي
+              </p>
+              <p className="text-[12px] text-navy-500">كل أيام الدوام المحفوظة بالموقع بملف واحد ({new Set(sessions.map((s) => s.date)).size} يوم). بتقدر تعدّل عليه وترجع ترفعه.</p>
+              <button className="btn-ghost" onClick={() => download('all')} disabled={!!downloading || sessions.length === 0}>
+                {downloading === 'all' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} تنزيل السجل التراكمي
+              </button>
+            </div>
           </div>
           <label className="flex cursor-pointer flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-navy-200 bg-navy-50/40 p-10 text-center text-[13px] text-navy-500 hover:bg-navy-50">
             {busy ? <Loader2 className="h-9 w-9 animate-spin text-navy-300" /> : <UploadCloud className="h-9 w-9 text-navy-300" />}
@@ -315,7 +339,7 @@ export default function AdminImport() {
           )}
           <ul className="space-y-1 text-[12px] text-navy-400">
             <li className="flex items-center gap-2">
-              <FileSpreadsheet className="h-4 w-4 shrink-0" /> القالب الموحّد: صف لكل طالب بكل دوام — الحضور، الحفظ والمراجعة (مطلوب / مسمّع / الصفحات / الجودة)، الالتزام، الملاحظات، والمطلوب للدوام القادم.
+              <FileSpreadsheet className="h-4 w-4 shrink-0" /> ارفع ملف الدوام أو السجل التراكمي كما هو: الموقع يحفظ الجديد والمعدّل بس، والأيام المحفوظة اللي ما تغيّرت ما بتنلمس.
             </li>
             <li className="pr-6">الشيت القديم (أسماء الطلاب فوق الأعمدة) لسا مقبول. صف "المجموع" والصفوف الفاضية يتم تجاهلها تلقائيًا.</li>
             <li className="pr-6">الخلية الفاضية ما بتمسح شي: الالتزام والملاحظات المدخلة بالموقع تبقى إذا ما كتبتها بالملف. والجزء المتروك فاضي (ما عليه حفظ أو مراجعة) ما بينحسب عليه.</li>
