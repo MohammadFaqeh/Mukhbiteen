@@ -44,7 +44,7 @@ export default function ParentHome() {
         <div className="flex flex-col gap-2 md:col-span-2 xl:col-span-5">
           <WorshipCard weekDays={weekDays} monthAverage={stats.worship} />
           <Link to="/parent/worship" className="btn-soft justify-center">
-            <HandHeart className="h-4 w-4" /> عبّي عبادات اليوم
+            <HandHeart className="h-4 w-4" /> تعبئة عبادات اليوم
           </Link>
         </div>
       </div>

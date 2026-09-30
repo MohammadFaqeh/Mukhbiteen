@@ -3,7 +3,7 @@ import { Check, ChevronLeft, ChevronRight, Loader2, Minus, Plus, Save } from 'lu
 import { useData } from '@/context/DataContext';
 import { useToast } from '@/context/ToastContext';
 import type { DailyWorship, PrayerKey, PrayerLocation } from '@/types';
-import { PRAYER_ITEMS, WEEKDAY_LABELS, dailyWorshipScore, weekDates, weekStartOf } from '@/utils/worship';
+import { PRAYER_ITEMS, WEEKDAY_LABELS, dailyWorshipScore, weekDates, weekStartOf, wirdPages } from '@/utils/worship';
 import { TODAY } from '@/utils/today';
 import { cx, formatDayMonth } from '@/utils/format';
 
@@ -48,6 +48,27 @@ function Choice({ on, onClick, tone = 'green', children }: { on: boolean; onClic
   );
 }
 
+/** عدّاد + / − بقيم محددة (زوجية للضحى والرواتب، فردية للوتر) */
+function Stepper({ value, values, onChange, zeroLabel }: { value: number; values: number[]; onChange: (v: number) => void; zeroLabel: string }) {
+  const i = Math.max(0, values.findIndex((v) => v >= value));
+  const btn = 'flex h-11 w-11 items-center justify-center rounded-xl border border-navy-100 bg-white text-navy-700 active:scale-95 disabled:opacity-30';
+  return (
+    <div className="flex items-center gap-3">
+      <button type="button" className={btn} onClick={() => onChange(values[Math.max(0, i - 1)])} disabled={i === 0} aria-label="إنقاص">
+        <Minus className="h-5 w-5" />
+      </button>
+      <span className="min-w-[4.5rem] text-center text-[20px] font-extrabold text-navy-900">{value ? value : <span className="text-[14px] font-bold text-navy-400">{zeroLabel}</span>}</span>
+      <button type="button" className={btn} onClick={() => onChange(values[Math.min(values.length - 1, i + 1)])} disabled={i === values.length - 1} aria-label="زيادة">
+        <Plus className="h-5 w-5" />
+      </button>
+      {value > 0 && <span className="text-[13px] text-navy-400">ركعات</span>}
+    </div>
+  );
+}
+
+const EVEN = [0, 2, 4, 6, 8, 10, 12];
+const ODD = [0, 1, 3, 5, 7, 9, 11];
+
 function Block({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
   return (
     <div className="space-y-2 border-t border-navy-50 pt-4 first:border-0 first:pt-0">
@@ -86,6 +107,7 @@ export default function WorshipDayForm({ studentId, worship }: { studentId: stri
   const missing = [...PRAYER_ITEMS.filter((p) => !d.prayers[p.key]).map((p) => `صلاة ${p.label}`), ...(d.parentsSatisfaction === undefined ? ['رضا الوالدين'] : [])];
   const future = date > TODAY;
   const dayLabel = WEEKDAY_LABELS[dates.indexOf(date)] ?? '';
+  const wird = wirdPages(d);
 
   const goWeek = (n: number) => {
     const ws = addDays(weekStart, 7 * n);
@@ -100,11 +122,11 @@ export default function WorshipDayForm({ studentId, worship }: { studentId: stri
     try {
       const rec = { ...d, prayers: d.prayers as Record<PrayerKey, PrayerLocation>, parentsSatisfaction: d.parentsSatisfaction! };
       await upsertDailyWorship([rec]);
-      toast(`تم حفظ عبادات يوم ${dayLabel} ✓`);
+      toast(`تم حفظ عبادات يوم ${dayLabel}`);
       const next = dates.find((x) => x > date && x <= TODAY && !saved.has(x));
       if (next) setDate(next);
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'تعذّر الحفظ، حاول مرة ثانية.');
+      toast(e instanceof Error ? e.message : 'تعذّر الحفظ، يُرجى المحاولة مرة أخرى.');
     } finally {
       setBusy(false);
     }
@@ -119,9 +141,9 @@ export default function WorshipDayForm({ studentId, worship }: { studentId: stri
           <ChevronRight className="h-5 w-5" />
         </button>
         <div className="text-center">
-          <p className="text-[16px] font-extrabold text-navy-900">تعبئة العبادات</p>
+          <p className="text-[16px] font-extrabold text-navy-900">تعبئة جدول العبادات</p>
           <p className="text-[12px] text-navy-400">
-            أسبوع {formatDayMonth(dates[0])} – {formatDayMonth(dates[5])} · تعبّى {filledCount} من 6 أيام
+            أسبوع {formatDayMonth(dates[0])} – {formatDayMonth(dates[5])} · تمّت تعبئة {filledCount} من 6 أيام
           </p>
         </div>
         <button className="rounded-full p-2 text-navy-500 hover:bg-navy-50 disabled:opacity-30" onClick={() => goWeek(1)} disabled={weekStart >= weekStartOf(TODAY)} aria-label="الأسبوع التالي">
@@ -160,88 +182,70 @@ export default function WorshipDayForm({ studentId, worship }: { studentId: stri
         </div>
 
         <div className="space-y-4">
-          <Block title="الصلوات" hint="(وين صلّى كل صلاة؟)">
+          <Block title="الصلوات" hint="(مكان أداء كل صلاة)">
             <div className="space-y-2">
               {PRAYER_ITEMS.map((p) => (
                 <div key={p.key} className="flex items-center gap-2">
                   <span className="w-14 shrink-0 text-[14px] font-bold text-navy-700">{p.label}</span>
                   <Choice on={d.prayers[p.key] === 'mosque'} onClick={() => setPrayer(p.key, 'mosque')}>
-                    بالمسجد
+                    في المسجد
                   </Choice>
                   <Choice on={d.prayers[p.key] === 'home'} tone="amber" onClick={() => setPrayer(p.key, 'home')}>
-                    بالبيت
-                  </Choice>
-                  <Choice on={d.prayers[p.key] === 'missed'} tone="red" onClick={() => setPrayer(p.key, 'missed')}>
-                    ما صلّى
+                    في البيت
                   </Choice>
                 </div>
               ))}
             </div>
           </Block>
 
-          <Block title="الأذكار" hint="(اكبس على اللي قالها)">
+          <Block title="الأذكار" hint="(اختر الأذكار التي قالها)">
             <div className="flex gap-2">
               <Choice on={d.morningAdhkar} onClick={() => set('morningAdhkar', !d.morningAdhkar)}>
-                {d.morningAdhkar && <Check className="ml-1 inline h-4 w-4" />}الصباح
+                {d.morningAdhkar && <Check className="ml-1 inline h-4 w-4" />}أذكار الصباح
               </Choice>
               <Choice on={d.eveningAdhkar} onClick={() => set('eveningAdhkar', !d.eveningAdhkar)}>
-                {d.eveningAdhkar && <Check className="ml-1 inline h-4 w-4" />}المساء
+                {d.eveningAdhkar && <Check className="ml-1 inline h-4 w-4" />}أذكار المساء
               </Choice>
               <Choice on={d.sleepAdhkar} onClick={() => set('sleepAdhkar', !d.sleepAdhkar)}>
-                {d.sleepAdhkar && <Check className="ml-1 inline h-4 w-4" />}النوم
+                {d.sleepAdhkar && <Check className="ml-1 inline h-4 w-4" />}أذكار النوم
               </Choice>
             </div>
           </Block>
 
-          <Block title="صلاة الضحى">
-            <div className="flex gap-2">
-              {[0, 2, 4, 6, 8].map((n) => (
-                <Choice key={n} on={d.duhaRakahs === n} tone={n ? 'green' : 'red'} onClick={() => set('duhaRakahs', n)}>
-                  {n ? `${n}` : 'ما صلّى'}
-                </Choice>
-              ))}
-            </div>
+          <Block title="صلاة الضحى" hint="(عدد الركعات)">
+            <Stepper value={d.duhaRakahs} values={EVEN} onChange={(v) => set('duhaRakahs', v)} zeroLabel="لم يصلِّ" />
           </Block>
 
-          <Block title="الوتر">
-            <div className="flex gap-2">
-              {[0, 1, 3, 5].map((n) => (
-                <Choice key={n} on={d.witrRakahs === n} tone={n ? 'green' : 'red'} onClick={() => set('witrRakahs', n)}>
-                  {n ? `${n}` : 'ما صلّى'}
-                </Choice>
-              ))}
-            </div>
+          <Block title="صلاة الوتر" hint="(عدد الركعات)">
+            <Stepper value={d.witrRakahs} values={ODD} onChange={(v) => set('witrRakahs', v)} zeroLabel="لم يصلِّ" />
           </Block>
 
           <Block title="قيام الليل">
             <div className="flex gap-2">
               <Choice on={d.qiyam} onClick={() => set('qiyam', true)}>
-                قام
+                قام الليل
               </Choice>
-              <Choice on={!d.qiyam} tone="red" onClick={() => set('qiyam', false)}>
-                ما قام
+              <Choice on={!d.qiyam} tone="navy" onClick={() => set('qiyam', false)}>
+                لم يقم
               </Choice>
             </div>
           </Block>
 
-          <Block title="السنن الرواتب" hint="(كم ركعة من 12)">
-            <div className="flex items-center gap-3">
-              <button type="button" className="flex h-11 w-11 items-center justify-center rounded-xl border border-navy-100 bg-white text-navy-700 active:scale-95" onClick={() => set('rawatibRakahs', Math.max(0, d.rawatibRakahs - 2))} aria-label="أقل">
-                <Minus className="h-5 w-5" />
-              </button>
-              <span className="w-16 text-center text-[22px] font-extrabold text-navy-900">{d.rawatibRakahs}</span>
-              <button type="button" className="flex h-11 w-11 items-center justify-center rounded-xl border border-navy-100 bg-white text-navy-700 active:scale-95" onClick={() => set('rawatibRakahs', Math.min(12, d.rawatibRakahs + 2))} aria-label="أكثر">
-                <Plus className="h-5 w-5" />
-              </button>
-            </div>
+          <Block title="السنن الرواتب" hint="(عدد الركعات من 12)">
+            <Stepper value={d.rawatibRakahs} values={EVEN} onChange={(v) => set('rawatibRakahs', v)} zeroLabel="لم يصلِّ" />
           </Block>
 
-          <Block title="ورد القراءة من المصحف" hint="(اختياري)">
-            <div className="flex items-center gap-2 text-[14px] text-navy-600">
+          <Block title="ورد القراءة من المصحف">
+            <div className="flex flex-wrap items-center gap-2 text-[14px] text-navy-600">
               من صفحة
-              <input type="number" inputMode="numeric" min={1} max={604} className="input w-24 text-center" value={d.wirdFromPage ?? ''} onChange={(e) => set('wirdFromPage', e.target.value === '' ? undefined : Number(e.target.value))} />
-              إلى
-              <input type="number" inputMode="numeric" min={1} max={604} className="input w-24 text-center" value={d.wirdToPage ?? ''} onChange={(e) => set('wirdToPage', e.target.value === '' ? undefined : Number(e.target.value))} />
+              <input type="number" inputMode="numeric" min={1} max={604} className="input w-24 text-center" value={d.wirdFromPage ?? ''} onChange={(e) => set('wirdFromPage', e.target.value === '' ? undefined : Number(e.target.value))} aria-label="من صفحة" />
+              إلى صفحة
+              <input type="number" inputMode="numeric" min={1} max={604} className="input w-24 text-center" value={d.wirdToPage ?? ''} onChange={(e) => set('wirdToPage', e.target.value === '' ? undefined : Number(e.target.value))} aria-label="إلى صفحة" />
+              {wird !== undefined && (
+                <span className={cx('rounded-full px-3 py-1 text-[13px] font-bold', wird > 0 ? 'bg-emerald-50 text-emerald-800' : 'bg-burgundy-50 text-burgundy-700')}>
+                  {wird > 0 ? `عدد الصفحات: ${wird}` : 'صفحة النهاية قبل صفحة البداية'}
+                </span>
+              )}
             </div>
           </Block>
 
@@ -251,12 +255,12 @@ export default function WorshipDayForm({ studentId, worship }: { studentId: stri
                 تصدّق اليوم
               </Choice>
               <Choice on={!d.charity} tone="navy" onClick={() => set('charity', false)}>
-                لا
+                لم يتصدّق
               </Choice>
             </div>
           </Block>
 
-          <Block title="رضا الوالدين عنه اليوم" hint="(علامة من 100)">
+          <Block title="رضا الوالدين" hint="(علامة من 100)">
             <div className="flex items-center gap-2">
               <input
                 type="number"
@@ -266,20 +270,20 @@ export default function WorshipDayForm({ studentId, worship }: { studentId: stri
                 className="input w-28 text-center text-[20px] font-extrabold"
                 value={d.parentsSatisfaction ?? ''}
                 onChange={(e) => set('parentsSatisfaction', e.target.value === '' ? undefined : Math.max(0, Math.min(100, Math.round(Number(e.target.value)) || 0)))}
-                placeholder="مثلًا 90"
+                placeholder="مثال: 90"
                 aria-label="رضا الوالدين من 100"
               />
               <span className="text-[16px] font-bold text-navy-400">/ 100</span>
             </div>
           </Block>
 
-          <Block title="ملاحظة" hint="(اختياري)">
-            <textarea className="input min-h-[60px]" value={d.notes ?? ''} onChange={(e) => set('notes', e.target.value)} placeholder="أي شي حابب يعرفه المشرف" />
+          <Block title="ملاحظات" hint="(اختيارية)">
+            <textarea className="input min-h-[60px]" value={d.notes ?? ''} onChange={(e) => set('notes', e.target.value)} placeholder="ملاحظة للمشرف" />
           </Block>
         </div>
       </div>
 
-      {missing.length > 0 && <p className="rounded-xl bg-amber-50 px-3 py-2 text-[13px] text-amber-800">باقي تختار: {missing.join('، ')}</p>}
+      {missing.length > 0 && <p className="rounded-xl bg-amber-50 px-3 py-2 text-[13px] text-amber-800">يُرجى تحديد: {missing.join('، ')}</p>}
       <button className="btn-accent w-full py-3.5 text-[16px]" onClick={save} disabled={busy || missing.length > 0 || future}>
         {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />} حفظ يوم {dayLabel}
       </button>

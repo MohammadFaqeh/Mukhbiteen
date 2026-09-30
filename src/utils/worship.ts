@@ -70,7 +70,7 @@ export function dailyWorshipScore(d: DailyWorship): number {
   const witrPts = d.witrRakahs > 0 ? 5 : 0;
   const rawatibPts = (clamp(d.rawatibRakahs, 0, 12) / 12) * 5;
   const parentsPts = (clamp(d.parentsSatisfaction, 0, 100) / 100) * 10;
-  const wirdPts = d.wirdFromPage != null && d.wirdToPage != null && d.wirdToPage > d.wirdFromPage ? 5 : 0;
+  const wirdPts = (wirdPages(d) ?? 0) > 0 ? 5 : 0;
   return round1(clamp(prayerPts + adhkarPts + duhaPts + qiyamPts + witrPts + rawatibPts + parentsPts + wirdPts, 0, 100));
 }
 
@@ -82,8 +82,8 @@ export function weekWorshipScore(days: DailyWorship[]): number {
   return round1(clamp(avg + bonus, 0, 100));
 }
 
-/** عدد صفحات ورد اليوم (نظرًا عن المصحف)، أو undefined إن لم يُسجَّل */
-export function wirdPages(d: DailyWorship): number | undefined {
+/** عدد صفحات ورد اليوم (نظرًا عن المصحف) شاملًا البداية والنهاية (من 5 إلى 10 = 6 صفحات)، أو undefined إن لم يُسجَّل */
+export function wirdPages(d: Pick<DailyWorship, 'wirdFromPage' | 'wirdToPage'>): number | undefined {
   if (d.wirdFromPage == null || d.wirdToPage == null) return undefined;
-  return Math.max(0, d.wirdToPage - d.wirdFromPage);
+  return Math.max(0, d.wirdToPage - d.wirdFromPage + 1);
 }

@@ -34,7 +34,7 @@ export default function ParentWorship() {
     <div>
       <PageHeader
         title="العبادات"
-        subtitle="عبّي كل يوم لحال (من السبت إلى الخميس) – يوم الجمعة هو يوم الدوام بالمركز"
+        subtitle="تُعبّأ العبادات يومًا بيوم (من السبت إلى الخميس)، ويوم الجمعة هو يوم الدوام في المركز"
         actions={
           weeks.length > 1 && (
             <Select value={weekStart} onChange={setWeekStart} options={weeks.map((w) => ({ value: w, label: `أسبوع ${formatDate(w)}` }))} className="w-52" ariaLabel="اختيار الأسبوع" />
@@ -73,7 +73,7 @@ export default function ParentWorship() {
 
       <details className="card group mt-4 p-5">
         <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2">
-          <h3 className="section-title">عرض الأسبوع كامل (جدول)</h3>
+          <h3 className="section-title">عرض جدول الأسبوع كاملًا</h3>
           <span className="text-[13px] text-navy-500">
             علامة الأسبوع: <b className="text-navy-900">{pct(weekScore)}</b> <span className="text-navy-300 group-open:hidden">▾</span>
           </span>
