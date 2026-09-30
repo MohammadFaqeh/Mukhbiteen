@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BookOpen, Calculator, Check, CheckCheck, ExternalLink, ListPlus, Loader2, MessageSquarePlus, RotateCcw, Save, Search, Trash2 } from 'lucide-react';
+import { AlertTriangle, BookOpen, Calculator, Check, CheckCheck, ExternalLink, ListPlus, Loader2, MessageSquarePlus, RotateCcw, Save, Search, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { normalizeArabic } from '@/utils/recitationLog';
 import { useData } from '@/context/DataContext';
@@ -8,8 +8,9 @@ import { useToast } from '@/context/ToastContext';
 import { useConfirmDelete } from '@/hooks/useConfirmDelete';
 import PageHeader from '@/components/shared/PageHeader';
 import Avatar from '@/components/ui/Avatar';
+import Select from '@/components/ui/Select';
 import { AttendancePicker, CommitmentSelect, NumberInput } from '@/components/admin/fields';
-import type { AttendanceStatus, CommitmentLevel, DailyWorship, SessionRecord } from '@/types';
+import type { AttendanceStatus, CommitmentLevel, DailyWorship, SessionRecord, Student } from '@/types';
 import { TODAY } from '@/utils/today';
 import { suggestScore } from '@/utils/stats';
 import { weekDates, weekStartOf, weekWorshipScore } from '@/utils/worship';
@@ -57,13 +58,56 @@ function Cell({ label, children, className }: { label: string; children: ReactNo
 
 const DRAFT_KEY = 'mukhbiteen.draft.attendance';
 
-function loadDraft(): { date: string; rows: Row[] } | null {
+/**
+ * مسودة تعديلات غير محفوظة فقط (dirty). savedKey = بصمة المحفوظ لهذا اليوم لحظة بدء التعديل،
+ * لمعرفة إذا انحفظت بيانات أحدث بعدها (مثلًا من ملف Excel).
+ */
+interface Draft {
+  date: string;
+  rows: Row[];
+  dirty: true;
+  savedKey: string;
+}
+function loadDraft(): Draft | null {
   try {
-    const raw = sessionStorage.getItem(DRAFT_KEY);
-    return raw ? JSON.parse(raw) : null;
+    const d = JSON.parse(sessionStorage.getItem(DRAFT_KEY) ?? 'null');
+    return d?.dirty ? d : null; // مسودات قديمة بلا تعديل فعلي تُتجاهل — المحفوظ هو المرجع
   } catch {
     return null;
   }
+}
+function clearDraft() {
+  try {
+    sessionStorage.removeItem(DRAFT_KEY);
+  } catch {
+    /* التخزين غير متاح */
+  }
+}
+
+/** صفوف الصفحة من المحفوظ بالموقع لهذا التاريخ (أو قيم افتراضية ليوم جديد) */
+function rowsFromSaved(students: Student[], sessions: SessionRecord[], date: string): Row[] {
+  return students.map((st) => {
+    const ex = sessions.find((s) => s.studentId === st.id && s.date === date);
+    return {
+      studentId: st.id,
+      attendance: ex?.attendance ?? 'present',
+      commitment: ex?.commitment ?? 'excellent',
+      score: ex?.score,
+      hasMem: ex ? !!ex.memorization : true,
+      memGrade: ex?.memorization?.grade ?? 90,
+      memRequiredPages: ex?.memorization?.requiredPages ?? 0,
+      memCompletedPages: ex?.memorization?.completedPages ?? 0,
+      memRecited: ex?.memorization?.recited,
+      hasRev: ex ? !!ex.revision : true,
+      revGrade: ex?.revision?.grade ?? 90,
+      revRequiredPages: ex?.revision?.requiredPages ?? 0,
+      revCompletedPages: ex?.revision?.completedPages ?? 0,
+      revRevised: ex?.revision?.revised,
+      notes: ex?.notes ?? '',
+      showNotes: !!ex?.notes,
+      showDetails: !!(ex?.memorization?.recited || ex?.revision?.revised),
+    };
+  });
 }
 
 export default function AdminAttendance() {
@@ -72,10 +116,12 @@ export default function AdminAttendance() {
   const confirmDelete = useConfirmDelete();
   const draft = useRef(loadDraft()).current; // يُقرأ مرة واحدة فقط عند فتح الصفحة
   const [date, setDate] = useState(draft?.date ?? TODAY);
-  // بعد تعريف date: استخدامه قبل تعريفه كان يرمي خطأ ويبيّض الصفحة أول ما يكون في دوام محفوظ
-  const savedForDate = sessions.filter((s) => s.date === date);
-  const [rows, setRows] = useState<Row[]>(draft?.rows ?? []);
-  const skipNextPopulate = useRef(!!draft);
+  const savedForDate = useMemo(() => sessions.filter((s) => s.date === date), [sessions, date]);
+  const savedKey = useMemo(() => JSON.stringify([...savedForDate].sort((x, y) => x.id.localeCompare(y.id))), [savedForDate]);
+  const savedDates = useMemo(() => [...new Set(sessions.map((s) => s.date))].sort().reverse(), [sessions]);
+  const [rows, setRows] = useState<Row[]>(() => draft?.rows ?? rowsFromSaved(students, sessions, date));
+  const [dirty, setDirty] = useState(!!draft); // في تعديلات بالصفحة ما انحفظت
+  const [loadedKey, setLoadedKey] = useState(draft?.savedKey ?? savedKey); // بصمة المحفوظ اللي الصفوف مبنية عليه
   const [q, setQ] = useState(''); // فلترة العرض فقط — الحفظ يشمل كل الطلاب
 
   /** علامة أسبوع العبادات (سبت-خميس) المرتبط بهذا التاريخ، لكل طالب */
@@ -90,50 +136,45 @@ export default function AdminAttendance() {
     return map;
   }, [students, dailyWorship, date]);
 
-  // تعبئة الصفوف من السجلات الموجودة لهذا التاريخ (إن وُجدت).
-  // معتمدة على [date] فقط بقصد: تغيّر مرجع students/sessions بالخلفية (كإعادة تحميل صامتة) ما لازم يمسح تعديلات غير محفوظة.
-  useEffect(() => {
-    if (skipNextPopulate.current) {
-      skipNextPopulate.current = false; // أول تشغيل بعد استرجاع Draft محفوظ — لا تستبدله
-      return;
-    }
-    setRows(
-      students.map((st) => {
-        const ex = sessions.find((s) => s.studentId === st.id && s.date === date);
-        return {
-          studentId: st.id,
-          attendance: ex?.attendance ?? 'present',
-          commitment: ex?.commitment ?? 'excellent',
-          score: ex?.score,
-          hasMem: ex ? !!ex.memorization : true,
-          memGrade: ex?.memorization?.grade ?? 90,
-          memRequiredPages: ex?.memorization?.requiredPages ?? 0,
-          memCompletedPages: ex?.memorization?.completedPages ?? 0,
-          memRecited: ex?.memorization?.recited,
-          hasRev: ex ? !!ex.revision : true,
-          revGrade: ex?.revision?.grade ?? 90,
-          revRequiredPages: ex?.revision?.requiredPages ?? 0,
-          revCompletedPages: ex?.revision?.completedPages ?? 0,
-          revRevised: ex?.revision?.revised,
-          notes: ex?.notes ?? '',
-          showNotes: !!ex?.notes,
-          showDetails: !!(ex?.memorization?.recited || ex?.revision?.revised),
-        };
-      }),
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [date]);
+  /** يعرض المحفوظ بالموقع لهذا اليوم ويتجاهل أي تعديل غير محفوظ */
+  const showSaved = () => {
+    setRows(rowsFromSaved(students, sessions, date));
+    setLoadedKey(savedKey);
+    setDirty(false);
+    clearDraft();
+  };
 
-  // حفظ Draft بالجلسة عند أي تعديل، حتى ينجو من إعادة تحميل الصفحة أو التنقل بين التبويبات
+  // تزامن مع المحفوظ: بدون تعديلات ← الصفحة تعرض المحفوظ دائمًا وتتحدّث لحالها (مثلًا بعد رفع ملف Excel).
+  // مع تعديلات غير محفوظة ← ما نمسحها، بس ننبّه إذا انحفظت بيانات أحدث لنفس اليوم.
+  const newerSaved = dirty && savedKey !== loadedKey;
   useEffect(() => {
+    if (!dirty) showSaved();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date, savedKey, students.length, dirty]);
+
+  // المسودة تُحفظ فقط عند وجود تعديلات فعلية، حتى تنجو من إعادة التحميل أو التنقل بين الصفحات
+  useEffect(() => {
+    if (!dirty) return;
     try {
-      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ date, rows }));
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ date, rows, dirty: true, savedKey: loadedKey } satisfies Draft));
     } catch {
       /* التخزين غير متاح */
     }
-  }, [date, rows]);
+  }, [date, rows, dirty, loadedKey]);
 
-  const patch = (id: string, p: Partial<Row>) => setRows((r) => r.map((x) => (x.studentId === id ? { ...x, ...p } : x)));
+  const edit = (fn: (r: Row[]) => Row[]) => {
+    setDirty(true);
+    setRows(fn);
+  };
+  const changeDate = (d: string) => {
+    if (!d || d === date) return;
+    if (dirty && !confirm('عندك تعديلات ما انحفظت على هذا اليوم. تتركها وتنتقل لتاريخ ثاني؟')) return;
+    setDirty(false);
+    clearDraft();
+    setDate(d);
+  };
+
+  const patch = (id: string, p: Partial<Row>) => edit((r) => r.map((x) => (x.studentId === id ? { ...x, ...p } : x)));
 
   /** توحيد كتابة أرقام الصفحات (415 - 416 ← 415-416)، وإذا المنجز فاضي يتعبّى بعدد الصفحات */
   const fixPages = (r: Row, part: 'mem' | 'rev') => {
@@ -150,7 +191,7 @@ export default function AdminAttendance() {
   }, [rows]);
 
   const calcAll = () =>
-    setRows((r) =>
+    edit((r) =>
       r.map((x) => ({
         ...x,
         score:
@@ -185,11 +226,9 @@ export default function AdminAttendance() {
     setSaving(true);
     try {
       await upsertSessions(recs);
-      try {
-        sessionStorage.removeItem(DRAFT_KEY);
-      } catch {
-        /* التخزين غير متاح */
-      }
+      // بعد الحفظ: الصفحة ترجع تعرض المحفوظ (يتحدّث تلقائيًا مع savedKey)
+      setDirty(false);
+      clearDraft();
       toast(`تم حفظ دوام ${recs.length} طالبًا`);
     } catch (e) {
       toast(e instanceof Error ? e.message : 'حدث خطأ أثناء الحفظ.');
@@ -205,8 +244,17 @@ export default function AdminAttendance() {
         subtitle={formatLongDate(date)}
         actions={
           <>
-            <input type="date" className="input w-44" value={date} onChange={(e) => setDate(e.target.value)} aria-label="تاريخ الدوام" />
-            <button className="btn-ghost" onClick={() => setRows((r) => r.map((x) => ({ ...x, attendance: 'present' })))}>
+            <input type="date" className="input w-44" value={date} onChange={(e) => changeDate(e.target.value)} aria-label="تاريخ الدوام" />
+            {savedDates.length > 0 && (
+              <Select
+                className="w-48"
+                ariaLabel="الأيام المحفوظة"
+                value={savedDates.includes(date) ? date : ''}
+                onChange={changeDate}
+                options={[{ value: '', label: `الأيام المحفوظة (${savedDates.length})` }, ...savedDates.map((d) => ({ value: d, label: formatLongDate(d) }))]}
+              />
+            )}
+            <button className="btn-ghost" onClick={() => edit((r) => r.map((x) => ({ ...x, attendance: 'present' })))}>
               <CheckCheck className="h-4 w-4" /> الجميع حاضر
             </button>
             <button className="btn-soft" onClick={calcAll}>
@@ -224,7 +272,35 @@ export default function AdminAttendance() {
         }
       />
 
+      {newerSaved && (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-800">
+          <span className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 shrink-0" /> انحفظت بيانات أحدث لهذا اليوم (مثلًا من ملف Excel) بعد ما بلشت تعدّل هون.
+          </span>
+          <div className="flex gap-2">
+            <button className="btn-accent px-3 py-1.5 text-[12px]" onClick={showSaved}>
+              عرض المحفوظ (تجاهل تعديلاتي)
+            </button>
+            <button className="btn-ghost px-3 py-1.5 text-[12px]" onClick={() => setLoadedKey(savedKey)}>
+              إكمال تعديلاتي
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="mb-3 flex flex-wrap items-center gap-2 text-[12px]">
+        {dirty ? (
+          <span className="flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 font-bold text-amber-800">
+            تعديلات غير محفوظة
+            <button className="underline decoration-dotted" onClick={() => confirm('تتجاهل تعديلاتك وترجع للمحفوظ؟') && showSaved()}>
+              تراجع
+            </button>
+          </span>
+        ) : savedForDate.length > 0 ? (
+          <span className="rounded-full bg-navy-800 px-3 py-1 font-bold text-white">محفوظ ✓ ({savedForDate.length} طالب)</span>
+        ) : (
+          <span className="rounded-full border border-dashed border-navy-200 px-3 py-1 text-navy-500">يوم جديد — مش محفوظ بعد</span>
+        )}
         <div className="relative ml-auto w-full max-w-xs sm:w-64">
           <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-navy-300" />
           <input className="input input-sm w-full pr-9" placeholder="ابحث عن طالب بهالصفحة…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="بحث عن طالب" />
