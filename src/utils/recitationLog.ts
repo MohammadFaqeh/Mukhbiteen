@@ -27,7 +27,9 @@ export type LogField =
   | 'notes'
   | 'nextMem'
   | 'nextRev'
-  | 'nextExtra';
+  | 'nextExtra'
+  | 'memToday'
+  | 'revToday';
 
 export interface LogEntry {
   studentName: string;
@@ -48,6 +50,8 @@ export interface LogEntry {
   nextMem?: string;
   nextRev?: string;
   nextExtra?: string;
+  memToday?: string; // المطلوب اليوم (نص) — يُحفظ وصفًا للمطلوب بسجل اليوم
+  revToday?: string;
 }
 
 /** ملاحظة على صف بالملف — لا تمنع الاستيراد، لكن تُعرض قبل الحفظ */
@@ -84,6 +88,7 @@ export function classifyHeader(raw: string): LogField | null {
   const rev = h.includes('مراجع');
   // "المطلوب القادم: ..." يُفحص أولًا لأنه فيه كمان "مطلوب" و"حفظ"
   if (h.includes('قادم')) return h.includes('مهمه') ? 'nextExtra' : mem ? 'nextMem' : rev ? 'nextRev' : null;
+  if (h.includes('اليوم')) return mem ? 'memToday' : rev ? 'revToday' : null;
   if (h.includes('جوده')) return mem ? 'memGrade' : rev ? 'revGrade' : 'grade';
   if (h.includes('حضور')) return 'attendance';
   if (h.includes('التزام')) return 'commitment';
@@ -316,6 +321,8 @@ function assign(X: Xlsx, e: LogEntry, f: LogField, c: CellObject | undefined, is
     case 'nextMem':
     case 'nextRev':
     case 'nextExtra':
+    case 'memToday':
+    case 'revToday':
       e[f] = raw || undefined;
       return;
     case 'attendance':

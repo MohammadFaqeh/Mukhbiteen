@@ -61,7 +61,7 @@ function toSession(e: LogEntry, studentId: string, prev: SessionRecord | undefin
   const revDone = e.revCompleted ?? 0;
   const memorization: MemorizationEntry | null = hasMem
     ? {
-        required: prev?.memorization?.required || (memReq ? pagesLabel(memReq) : ''),
+        required: e.memToday || prev?.memorization?.required || (memReq ? pagesLabel(memReq) : ''),
         recited: e.memText ?? prev?.memorization?.recited ?? '',
         requiredPages: memReq,
         completedPages: memDone,
@@ -72,7 +72,7 @@ function toSession(e: LogEntry, studentId: string, prev: SessionRecord | undefin
     : null;
   const revision: RevisionEntry | null = hasRev
     ? {
-        required: prev?.revision?.required || (revReq ? pagesLabel(revReq) : ''),
+        required: e.revToday || prev?.revision?.required || (revReq ? pagesLabel(revReq) : ''),
         revised: e.revText ?? prev?.revision?.revised ?? '',
         requiredPages: revReq,
         completedPages: revDone,
@@ -148,7 +148,7 @@ export default function AdminImport() {
   const download = async (kind: 'session' | 'all') => {
     setDownloading(kind);
     try {
-      await (kind === 'session' ? downloadSessionFile(fileDate, students, sessions) : downloadCumulativeFile(students, sessions));
+      await (kind === 'session' ? downloadSessionFile(fileDate, students, sessions, nextRequirements) : downloadCumulativeFile(students, sessions));
     } catch {
       toast('تعذّر إنشاء الملف.');
     } finally {
