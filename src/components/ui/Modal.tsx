@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { cx } from '@/utils/format';
 
@@ -27,7 +28,9 @@ export default function Modal({ open, onClose, title, subtitle, children, footer
 
   if (!open) return null;
   const w = { md: 'max-w-lg', lg: 'max-w-2xl', xl: 'max-w-4xl' }[size];
-  return (
+  // نرسم النافذة مباشرة داخل body: لو انرسمت داخل بطاقة (.card فيها backdrop-blur) أو قسم متحرك،
+  // المتصفح يحصرها جوّا حدود هذا العنصر وتطلع عناصر الصفحة فوقها (مثل نافذة تفاصيل "آخر أيام الدوام")
+  return createPortal(
     <div className="fixed inset-0 z-[70] flex items-end justify-center p-0 sm:items-center sm:p-6" role="dialog" aria-modal="true">
       <button className="absolute inset-0 animate-fade-in bg-navy-950/40 backdrop-blur-[3px]" onClick={onClose} aria-label="إغلاق" />
       <div className={cx('relative flex max-h-[92vh] w-full animate-pop-in flex-col overflow-hidden rounded-t-3xl bg-white shadow-lift sm:rounded-3xl', w)}>
@@ -43,6 +46,7 @@ export default function Modal({ open, onClose, title, subtitle, children, footer
         <div className="scrollbar-thin overflow-y-auto px-6 py-5">{children}</div>
         {footer && <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-navy-50 bg-paper/60 px-6 py-4">{footer}</footer>}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

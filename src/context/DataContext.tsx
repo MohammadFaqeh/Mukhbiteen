@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { Activity, DailyWorship, HonorBoard, NextRequirement, SessionRecord, Student } from '@/types';
+import type { Activity, DailyWorship, HonorBoard, NextRequirement, SessionRecord, Student, TajweedMaterial } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import {
@@ -15,6 +15,8 @@ import {
   sessionToRow,
   studentFromRow,
   studentToRow,
+  tajweedMaterialFromRow,
+  tajweedMaterialToRow,
 } from '@/lib/mappers';
 
 interface AppData {
@@ -24,6 +26,7 @@ interface AppData {
   nextRequirements: NextRequirement[];
   activities: Activity[];
   honorBoards: HonorBoard[];
+  tajweedMaterials: TajweedMaterial[];
 }
 
 interface DataValue extends AppData {
@@ -47,6 +50,7 @@ interface DataValue extends AppData {
   publishHonorBoard: (b: Omit<HonorBoard, 'id' | 'createdAt' | 'published'>) => Promise<HonorBoard>;
   unpublishHonorBoard: (id: string) => Promise<void>;
   deleteHonorBoard: (id: string) => Promise<void>;
+  saveTajweedMaterial: (m: TajweedMaterial) => Promise<void>;
 }
 
 const DataContext = createContext<DataValue | null>(null);
@@ -66,7 +70,11 @@ function storagePath(url: string | undefined, bucket: string) {
   return url && i >= 0 ? decodeURIComponent(url.slice(i + marker.length)) : null;
 }
 
-const empty: AppData = { students: [], sessions: [], dailyWorship: [], nextRequirements: [], activities: [], honorBoards: [] };
+const empty: AppData = { students: [], sessions: [], dailyWorship: [], nextRequirements: [], activities: [], honorBoards: [], tajweedMaterials: [] };
+
+/** رسالة واضحة لما تكون قاعدة البيانات أقدم من الكود (أعمدة/جداول جديدة بـ schema.sql لم تُنفَّذ بعد) */
+const SCHEMA_HINT = 'قاعدة البيانات تحتاج تحديث: افتح supabase/schema.sql وشغّله كاملًا من SQL Editor بـ Supabase ثم أعد المحاولة.';
+const schemaError = (msg: string, cols: RegExp) => new Error(cols.test(msg) ? SCHEMA_HINT : msg);
 
 export function DataProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -79,15 +87,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
     // نظهر شاشة "جارٍ التحميل" فقط أول مرة — أي إعادة تحميل لاحقة بالخلفية ما لازم تمسح الصفحة الحالية وتعيد بنائها
     if (!loadedOnce.current) setLoading(true);
     setError(null);
-    const [students, sessions, dailyWorship, nextRequirements, activities, honorBoards] = await Promise.all([
+    const [students, sessions, dailyWorship, nextRequirements, activities, honorBoards, tajweedMaterials] = await Promise.all([
       supabase.from('students').select('*').order('name'),
       supabase.from('sessions').select('*'),
       supabase.from('daily_worship').select('*'),
       supabase.from('next_requirements').select('*'),
       supabase.from('activities').select('*'),
       supabase.from('honor_boards').select('*'),
+      supabase.from('tajweed_materials').select('*'),
     ]);
     const firstError = [students, sessions, dailyWorship, nextRequirements, activities, honorBoards].find((r) => r.error)?.error;
+    if (tajweedMaterials.error) console.warn('جدول tajweed_materials غير موجود — شغّل supabase/schema.sql', tajweedMaterials.error.message);
     if (firstError) {
       setError(firstError.message);
       setLoading(false);
@@ -100,6 +110,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       nextRequirements: (nextRequirements.data ?? []).map(requirementFromRow),
       activities: (activities.data ?? []).map(activityFromRow),
       honorBoards: (honorBoards.data ?? []).map(honorBoardFromRow).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+      // جدول المواد جديد: لو قاعدة البيانات ما تحدّثت بعد، الموقع يشتغل عادي بدون مواد التجويد
+      tajweedMaterials: tajweedMaterials.error ? [] : (tajweedMaterials.data ?? []).map(tajweedMaterialFromRow),
     });
     loadedOnce.current = true;
     setLoading(false);
@@ -134,7 +146,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const updateStudent = useCallback(async (id: string, patch: Partial<Student>) => {
     const { error: err } = await supabase.from('students').update(studentToRow(patch)).eq('id', id);
-    if (err) throw new Error(err.message);
+    if (err) throw schemaError(err.message, /tajweed_/);
     setData((d) => ({ ...d, students: d.students.map((s) => (s.id === id ? { ...s, ...patch } : s)) }));
   }, []);
 
@@ -178,7 +190,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const upsertDailyWorship = useCallback(async (records: DailyWorship[]) => {
-    const { error: err } = await supabase.from('daily_worship').upsert(records.map(dailyWorshipToRow), { onConflict: 'id' });
+    let { error: err } = await supabase.from('daily_worship').upsert(records.map(dailyWorshipToRow), { onConflict: 'id' });
+    // قاعدة بيانات قديمة بدون عمود سورة الكهف — نحفظ اليوم بدونه بدل ما يفشل حفظ أهالي الطلاب
+    if (err && /kahf/.test(err.message)) {
+      console.warn('عمود kahf غير موجود بجدول daily_worship — شغّل تعديل schema.sql');
+      ({ error: err } = await supabase.from('daily_worship').upsert(
+        records.map((r) => {
+          const { kahf: _k, ...row } = dailyWorshipToRow(r);
+          return row;
+        }),
+        { onConflict: 'id' },
+      ));
+    }
     if (err) throw new Error(err.message);
     setData((d) => {
       const map = new Map(d.dailyWorship.map((s) => [s.id, s]));
@@ -222,22 +245,22 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const addActivity = useCallback(async (a: Omit<Activity, 'id'>) => {
     const created: Activity = { ...a, id: `a${Date.now().toString(36)}` };
     const { error: err } = await supabase.from('activities').insert(activityToRow(created));
-    if (err) throw new Error(err.message);
+    if (err) throw schemaError(err.message, /images|title/);
     setData((d) => ({ ...d, activities: [created, ...d.activities] }));
   }, []);
 
   const updateActivity = useCallback(async (id: string, patch: Partial<Activity>) => {
     const { error: err } = await supabase.from('activities').update(activityToRow(patch)).eq('id', id);
-    if (err) throw new Error(err.message);
+    if (err) throw schemaError(err.message, /images|title/);
     setData((d) => ({ ...d, activities: d.activities.map((a) => (a.id === id ? { ...a, ...patch } : a)) }));
   }, []);
 
   const deleteActivity = useCallback(async (id: string) => {
-    const image = data.activities.find((a) => a.id === id)?.image;
+    const images = data.activities.find((a) => a.id === id)?.images ?? [];
     const { error: err } = await supabase.from('activities').delete().eq('id', id);
     if (err) throw new Error(err.message);
-    const path = storagePath(image, 'activity-images');
-    if (path) await supabase.storage.from('activity-images').remove([path]);
+    const paths = images.map((im) => storagePath(im.url, 'activity-images')).filter((p): p is string => !!p);
+    if (paths.length) await supabase.storage.from('activity-images').remove(paths);
     setData((d) => ({ ...d, activities: d.activities.filter((a) => a.id !== id) }));
   }, [data.activities]);
 
@@ -263,6 +286,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setData((d) => ({ ...d, honorBoards: d.honorBoards.filter((h) => h.id !== id) }));
   }, []);
 
+  const saveTajweedMaterial = useCallback(async (m: TajweedMaterial) => {
+    const row = tajweedMaterialToRow({ ...m, updatedAt: new Date().toISOString() });
+    const { error: err } = await supabase.from('tajweed_materials').upsert(row, { onConflict: 'course' });
+    if (err) throw schemaError(err.message, /tajweed_materials|relation|schema cache/);
+    const saved = tajweedMaterialFromRow(row);
+    setData((d) => ({ ...d, tajweedMaterials: [...d.tajweedMaterials.filter((x) => x.course !== m.course), saved] }));
+  }, []);
+
   const value = useMemo<DataValue>(
     () => ({
       ...data,
@@ -286,6 +317,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       publishHonorBoard,
       unpublishHonorBoard,
       deleteHonorBoard,
+      saveTajweedMaterial,
     }),
     [
       data,
@@ -309,6 +341,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       publishHonorBoard,
       unpublishHonorBoard,
       deleteHonorBoard,
+      saveTajweedMaterial,
     ],
   );
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

@@ -11,8 +11,12 @@ export const PRAYER_ITEMS: { key: PrayerKey; label: string }[] = [
   { key: 'isha', label: 'العشاء' },
 ];
 
-/** أيام أسبوع العبادات المتابَعة (السبت..الخميس) – الجمعة يوم الدوام بالمركز ويُقيَّم مباشرة هناك */
-export const WEEKDAY_LABELS = ['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
+/** أيام أسبوع العبادات (السبت..الجمعة) — الجمعة آخر يوم بالأسبوع وفيها قراءة سورة الكهف */
+export const WEEKDAY_LABELS = ['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'];
+export const WEEK_DAYS = WEEKDAY_LABELS.length;
+
+/** هل التاريخ يوم جمعة؟ */
+export const isFriday = (iso: string) => new Date(`${iso}T12:00:00`).getDay() === 5;
 
 const clamp = (n: number, a: number, b: number) => Math.max(a, Math.min(b, n));
 
@@ -25,35 +29,37 @@ export function weekStartOf(iso: string): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** الأيام الستة لأسبوع العبادات بدءًا من تاريخ السبت المعطى */
+/** أيام أسبوع العبادات السبعة بدءًا من تاريخ السبت المعطى */
 export function weekDates(weekStart: string): string[] {
   const out: string[] = [];
   const d = new Date(`${weekStart}T12:00:00`);
   if (Number.isNaN(d.getTime())) return out;
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < WEEK_DAYS; i++) {
     out.push(d.toISOString().slice(0, 10));
     d.setDate(d.getDate() + 1);
   }
   return out;
 }
 
+/** يوم فاضي للتعبئة اليدوية من المشرف — كل شيء غير منجز حتى يحدده المشرف (حتى لا يُسجَّل يوم كامل بالغلط) */
 export function emptyDailyWorship(studentId: string, date: string): DailyWorship {
   return {
     id: `${studentId}-${date}`,
     studentId,
     date,
-    prayers: { fajr: 'mosque', dhuhr: 'mosque', asr: 'mosque', maghrib: 'mosque', isha: 'mosque' },
-    morningAdhkar: true,
-    eveningAdhkar: true,
-    sleepAdhkar: true,
-    duhaRakahs: 2,
+    prayers: { fajr: 'missed', dhuhr: 'missed', asr: 'missed', maghrib: 'missed', isha: 'missed' },
+    morningAdhkar: false,
+    eveningAdhkar: false,
+    sleepAdhkar: false,
+    duhaRakahs: 0,
     qiyam: false,
-    witrRakahs: 1,
+    witrRakahs: 0,
     rawatibRakahs: 0,
-    parentsSatisfaction: 100,
+    parentsSatisfaction: 0,
     wirdFromPage: undefined,
     wirdToPage: undefined,
     charity: false,
+    kahf: false,
     notes: '',
   };
 }
@@ -74,11 +80,14 @@ export function dailyWorshipScore(d: DailyWorship): number {
   return round1(clamp(prayerPts + adhkarPts + duhaPts + qiyamPts + witrPts + rawatibPts + parentsPts + wirdPts, 0, 100));
 }
 
-/** علامة الأسبوع: متوسط الأيام المسجَّلة + علامة الصدقة إن تصدّق مرة واحدة على الأقل خلال الأسبوع (علامة اليوم لا تشمل الصدقة، فلا خصم عن الأيام الأخرى) */
+/**
+ * علامة الأسبوع: متوسط الأيام المسجَّلة + 3 للصدقة (مرة على الأقل خلال الأسبوع) + 3 لقراءة سورة الكهف يوم الجمعة.
+ * علامة اليوم لا تشمل الصدقة ولا الكهف، فلا خصم عن الأيام الأخرى.
+ */
 export function weekWorshipScore(days: DailyWorship[]): number {
   if (!days.length) return 0;
   const avg = days.reduce((a, d) => a + dailyWorshipScore(d), 0) / days.length;
-  const bonus = days.some((d) => d.charity) ? 3 : 0;
+  const bonus = (days.some((d) => d.charity) ? 3 : 0) + (days.some((d) => d.kahf) ? 3 : 0);
   return round1(clamp(avg + bonus, 0, 100));
 }
 

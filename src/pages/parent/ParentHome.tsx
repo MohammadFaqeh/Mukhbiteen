@@ -58,7 +58,7 @@ export default function ParentHome() {
       <SessionTimeline sessions={sessions} studentName={student.name} />
 
       <div className="grid gap-4 sm:gap-5 lg:grid-cols-12">
-        <ReportsPanel studentName={student.name} dense className="lg:col-span-8" />
+        <ReportsPanel student={student} dense className="lg:col-span-8" />
         <div className="lg:col-span-4">
           <SupervisorCard />
         </div>

@@ -34,7 +34,7 @@ export default function ParentWorship() {
     <div>
       <PageHeader
         title="العبادات"
-        subtitle="تُعبّأ العبادات يومًا بيوم (من السبت إلى الخميس)، ويوم الجمعة هو يوم الدوام في المركز"
+        subtitle="تُعبّأ العبادات يومًا بيوم من السبت إلى الجمعة، ويوم الجمعة فيه قراءة سورة الكهف"
         actions={
           weeks.length > 1 && (
             <Select value={weekStart} onChange={setWeekStart} options={weeks.map((w) => ({ value: w, label: `أسبوع ${formatDate(w)}` }))} className="w-52" ariaLabel="اختيار الأسبوع" />

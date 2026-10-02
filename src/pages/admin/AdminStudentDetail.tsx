@@ -112,7 +112,7 @@ export default function AdminStudentDetail() {
         {tab === 'revision' && <QuranTab kind="rev" studentId={id} sessions={sessions} />}
         {tab === 'worship' && <WorshipTab studentId={id} />}
         {tab === 'next' && <NextRequirementForm studentId={id} />}
-        {tab === 'reports' && <ReportsPanel studentName={student.name} dense />}
+        {tab === 'reports' && <ReportsPanel student={student} admin dense />}
       </div>
 
       <StudentFormModal open={editStudent} student={student} onClose={() => setEditStudent(false)} onDeleted={() => navigate('/admin/students', { replace: true })} />
@@ -362,20 +362,38 @@ function WorshipTab({ studentId }: { studentId: string }) {
   }, [mine]);
   const [weekStart, setWeekStart] = useState(weeks[0]);
   const dates = useMemo(() => weekDates(weekStart), [weekStart]);
+  // المسودة فيها فقط الأيام التي عبّأها ولي الأمر + الأيام التي يعبّيها المشرف يدويًا — الباقي يظهر رماديًا "لم يُعبّأ"
   const [draft, setDraft] = useState<Record<string, DailyWorship>>({});
+  const [manual, setManual] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const map: Record<string, DailyWorship> = {};
     dates.forEach((date) => {
-      map[date] = mine.find((d) => d.date === date) ?? emptyDailyWorship(studentId, date);
+      const saved = mine.find((d) => d.date === date);
+      if (saved) map[date] = saved;
     });
     setDraft(map);
+    setManual(new Set());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [weekStart]);
 
   const patch = (date: string, p: Partial<DailyWorship>) => setDraft((d) => ({ ...d, [date]: { ...d[date], ...p } }));
+  const fill = (date: string) => {
+    const charity = Object.values(draft).some((d) => d.charity);
+    setDraft((d) => ({ ...d, [date]: { ...emptyDailyWorship(studentId, date), charity } }));
+    setManual((m) => new Set(m).add(date));
+  };
+  const clear = (date: string) => {
+    setDraft(({ [date]: _drop, ...rest }) => rest);
+    setManual((m) => {
+      const n = new Set(m);
+      n.delete(date);
+      return n;
+    });
+  };
   const score = weekWorshipScore(Object.values(draft));
   const savedThisWeek = mine.filter((d) => dates.includes(d.date));
+  const filledCount = Object.keys(draft).length;
 
   const months = useMemo(() => [...new Set(mine.map((d) => d.date.slice(0, 7)))].sort().reverse(), [mine]);
 
@@ -384,6 +402,7 @@ function WorshipTab({ studentId }: { studentId: string }) {
     setSaving(true);
     try {
       await upsertDailyWorship(Object.values(draft));
+      setManual(new Set());
       toast('تم حفظ جدول العبادات لهذا الأسبوع');
     } catch (e) {
       toast(e instanceof Error ? e.message : 'حدث خطأ أثناء الحفظ.');
@@ -397,7 +416,9 @@ function WorshipTab({ studentId }: { studentId: string }) {
       <section className="card flex flex-wrap items-center justify-between gap-3 p-5">
         <div>
           <h3 className="section-title">جدول العبادات الأسبوعي</h3>
-          <p className="mt-0.5 text-[12px] text-navy-400">من السبت إلى الخميس — يوم الجمعة هو يوم الدوام بالمركز ويُقيَّم مباشرة هناك</p>
+          <p className="mt-0.5 text-[12px] text-navy-400">
+            من السبت إلى الجمعة · عبّأ ولي الأمر {filledCount - manual.size} من {dates.length} أيام — الأيام الرمادية لم تُعبّأ، واضغط "تعبئة" لإدخالها يدويًا
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <Select className="w-56" ariaLabel="اختيار الأسبوع" value={weekStart} onChange={setWeekStart} options={weeks.map((w) => ({ value: w, label: `أسبوع ${formatDate(w)}` }))} />
@@ -409,12 +430,13 @@ function WorshipTab({ studentId }: { studentId: string }) {
       </section>
 
       <section className="card p-5">
-        <WorshipWeekGrid dates={dates} days={draft} editable onChange={patch} />
+        <WorshipWeekGrid dates={dates} days={draft} editable onChange={patch} onFill={fill} onClear={clear} manual={manual} />
         <div className="mt-4 flex items-center justify-between gap-3 rounded-xl bg-navy-50/60 px-4 py-3">
           <label className="flex items-center gap-2 text-[13px] font-medium text-navy-700">
             <input
               type="checkbox"
               className="h-4 w-4 accent-emerald-600"
+              disabled={!filledCount}
               checked={Object.values(draft).some((d) => d.charity)}
               onChange={(e) => setDraft((d) => Object.fromEntries(Object.entries(d).map(([date, v]) => [date, { ...v, charity: e.target.checked }])))}
             />
@@ -430,13 +452,16 @@ function WorshipTab({ studentId }: { studentId: string }) {
             disabled={saving}
             onClick={async () => {
               const ok = await confirmDelete(`حذف جدول عبادات أسبوع ${formatDate(weekStart)} (${savedThisWeek.length} يوم محفوظ)؟`, () => deleteDailyWorship(savedThisWeek.map((d) => d.id)), 'تم حذف جدول الأسبوع');
-              if (ok) setDraft(Object.fromEntries(dates.map((date) => [date, emptyDailyWorship(studentId, date)])));
+              if (ok) {
+                setDraft({});
+                setManual(new Set());
+              }
             }}
           >
             <Trash2 className="h-4 w-4" /> حذف جدول الأسبوع
           </button>
         )}
-        <button className="btn-accent px-8" onClick={save} disabled={saving}>
+        <button className="btn-accent px-8" onClick={save} disabled={saving || !filledCount}>
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} حفظ جدول الأسبوع
         </button>
       </div>

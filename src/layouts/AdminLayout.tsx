@@ -1,7 +1,8 @@
+import { useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import ErrorBoundary from '@/components/shared/ErrorBoundary';
 import StudentQuickFind from '@/components/admin/StudentQuickFind';
-import { CalendarPlus, FileSpreadsheet, FileText, GalleryHorizontalEnd, LayoutDashboard, Users } from 'lucide-react';
+import { CalendarPlus, FileSpreadsheet, FileText, GalleryHorizontalEnd, LayoutDashboard, ScrollText, Users } from 'lucide-react';
 import Sidebar, { type NavItem } from './Sidebar';
 import BrandBackground from '@/components/brand/BrandBackground';
 import Footer from '@/components/brand/Footer';
@@ -18,6 +19,7 @@ const items: NavItem[] = [
   { to: '/admin/students', label: 'إدارة الطلاب', icon: Users },
   { to: '/admin/attendance', label: 'تسجيل دوام اليوم', icon: CalendarPlus },
   { to: '/admin/import', label: 'استيراد سجل التسميع', icon: FileSpreadsheet },
+  { to: '/admin/tajweed', label: 'التجويد', icon: ScrollText },
   { to: '/admin/activities', label: 'الصور والأنشطة', icon: GalleryHorizontalEnd },
   { to: '/admin/reports', label: 'التقارير', icon: FileText },
 ];
@@ -27,6 +29,8 @@ export default function AdminLayout() {
   const { loading, error } = useData();
   const navigate = useNavigate();
   const { pathname } = useLocation(); // مفتاح ErrorBoundary: التنقل لصفحة ثانية يرجّعها طبيعية
+  // فتح أي صفحة يبدأ من أعلاها (المتصفح كان يحافظ على مكان التمرير من الصفحة السابقة — مثلًا زر تعبئة العبادات أسفل الرئيسية)
+  useEffect(() => window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior }), [pathname]);
   const [collapsed, toggleCollapsed] = useSidebarCollapsed();
   return (
     <div className="min-h-screen">

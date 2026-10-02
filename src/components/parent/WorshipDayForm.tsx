@@ -3,7 +3,7 @@ import { Check, ChevronLeft, ChevronRight, Loader2, Minus, Plus, Save } from 'lu
 import { useData } from '@/context/DataContext';
 import { useToast } from '@/context/ToastContext';
 import type { DailyWorship, PrayerKey, PrayerLocation } from '@/types';
-import { PRAYER_ITEMS, WEEKDAY_LABELS, dailyWorshipScore, weekDates, weekStartOf, wirdPages } from '@/utils/worship';
+import { PRAYER_ITEMS, WEEKDAY_LABELS, WEEK_DAYS, dailyWorshipScore, isFriday, weekDates, weekStartOf, wirdPages } from '@/utils/worship';
 import { TODAY } from '@/utils/today';
 import { cx, formatDayMonth } from '@/utils/format';
 
@@ -28,6 +28,7 @@ function blank(studentId: string, date: string): DayDraft {
     rawatibRakahs: 0,
     parentsSatisfaction: undefined,
     charity: false,
+    kahf: false,
     notes: '',
   };
 }
@@ -81,7 +82,7 @@ function Block({ title, hint, children }: { title: string; hint?: string; childr
 }
 
 /**
- * تعبئة جدول العبادات يومًا بيوم لولي الأمر (وللمشرف): أزرار أيام الأسبوع (السبت-الخميس) وبطاقة لليوم المختار
+ * تعبئة جدول العبادات يومًا بيوم لولي الأمر (وللمشرف): أزرار أيام الأسبوع (السبت-الجمعة) وبطاقة لليوم المختار
  * بنفس بنود الجدول الأسبوعي، بأزرار كبيرة تناسب الموبايل.
  */
 export default function WorshipDayForm({ studentId, worship }: { studentId: string; worship: DailyWorship[] }) {
@@ -146,7 +147,7 @@ export default function WorshipDayForm({ studentId, worship }: { studentId: stri
         <div className="text-center">
           <p className="text-[16px] font-extrabold text-navy-900">تعبئة جدول العبادات</p>
           <p className="text-[12px] text-navy-400">
-            أسبوع {formatDayMonth(dates[0])} – {formatDayMonth(dates[5])} · تمّت تعبئة {filledCount} من 6 أيام
+            أسبوع {formatDayMonth(dates[0])} – {formatDayMonth(dates[dates.length - 1])} · تمّت تعبئة {filledCount} من {WEEK_DAYS} أيام
           </p>
         </div>
         <button className="rounded-full p-2 text-navy-500 hover:bg-navy-50 disabled:opacity-30" onClick={() => goWeek(1)} disabled={weekStart >= weekStartOf(TODAY)} aria-label="الأسبوع التالي">
@@ -155,7 +156,7 @@ export default function WorshipDayForm({ studentId, worship }: { studentId: stri
       </div>
 
       {/* أيام الأسبوع */}
-      <div className="grid grid-cols-6 gap-1.5">
+      <div className="grid grid-cols-7 gap-1">
         {dates.map((x, i) => {
           const done = saved.has(x);
           return (
@@ -164,12 +165,12 @@ export default function WorshipDayForm({ studentId, worship }: { studentId: stri
               disabled={x > TODAY}
               onClick={() => setDate(x)}
               className={cx(
-                'flex flex-col items-center gap-0.5 rounded-xl border px-1 py-2 text-[12px] transition disabled:opacity-30',
+                'flex min-w-0 flex-col items-center gap-0.5 rounded-xl border px-0.5 py-2 text-[11px] transition disabled:opacity-30 sm:text-[12px]',
                 x === date ? 'border-navy-800 bg-navy-800 text-white' : done ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-navy-100 bg-white text-navy-600',
               )}
             >
-              <span className="font-bold">{WEEKDAY_LABELS[i]}</span>
-              <span className="text-[11px] opacity-80">{formatDayMonth(x)}</span>
+              <span className="w-full truncate text-center font-bold">{WEEKDAY_LABELS[i]}</span>
+              <span className="text-[11px] opacity-80">{Number(x.slice(8))}</span>
               <span className="h-4 text-[11px]">{done ? '✓' : x === TODAY ? 'اليوم' : ''}</span>
             </button>
           );
@@ -223,13 +224,10 @@ export default function WorshipDayForm({ studentId, worship }: { studentId: stri
             <Stepper value={d.witrRakahs} values={ODD} onChange={(v) => set('witrRakahs', v)} zeroLabel="لم يصلِّ" />
           </Block>
 
-          <Block title="قيام الليل">
+          <Block title="قيام الليل" hint="(اضغط إذا أدّاه)">
             <div className="flex gap-2">
-              <Choice on={d.qiyam} onClick={() => set('qiyam', true)}>
-                قام الليل
-              </Choice>
-              <Choice on={!d.qiyam} tone="navy" onClick={() => set('qiyam', false)}>
-                لم يقم
+              <Choice on={d.qiyam} onClick={() => set('qiyam', !d.qiyam)}>
+                {d.qiyam && <Check className="ml-1 inline h-4 w-4" />}قيام الليل
               </Choice>
             </div>
           </Block>
@@ -265,6 +263,16 @@ export default function WorshipDayForm({ studentId, worship }: { studentId: stri
               </Choice>
             </div>
           </Block>
+
+          {isFriday(date) && (
+            <Block title="سورة الكهف" hint="(يوم الجمعة — اضغط إذا قرأها)">
+              <div className="flex gap-2">
+                <Choice on={d.kahf} onClick={() => set('kahf', !d.kahf)}>
+                  {d.kahf && <Check className="ml-1 inline h-4 w-4" />}قراءة سورة الكهف
+                </Choice>
+              </div>
+            </Block>
+          )}
 
           <Block title="رضا الوالدين" hint="(علامة من 100)">
             <div className="flex items-center gap-2">

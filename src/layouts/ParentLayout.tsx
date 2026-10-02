@@ -1,6 +1,7 @@
+import { useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import ErrorBoundary from '@/components/shared/ErrorBoundary';
-import { BookOpenText, CalendarCheck2, CalendarClock, FileText, HandHeart, House } from 'lucide-react';
+import { BookOpenText, CalendarCheck2, CalendarClock, FileText, HandHeart, House, ScrollText } from 'lucide-react';
 import Sidebar, { type NavItem } from './Sidebar';
 import BrandBackground from '@/components/brand/BrandBackground';
 import Footer from '@/components/brand/Footer';
@@ -16,6 +17,7 @@ const items: NavItem[] = [
   { to: '/parent/next', label: 'المطلوب القادم', icon: CalendarClock },
   { to: '/parent/quran', label: 'الحفظ والمراجعة', icon: BookOpenText },
   { to: '/parent/worship', label: 'العبادات', icon: HandHeart },
+  { to: '/parent/tajweed', label: 'التجويد', icon: ScrollText },
   { to: '/parent/sessions', label: 'سجل الدوام', icon: CalendarCheck2 },
   { to: '/parent/reports', label: 'التقارير', icon: FileText },
 ];
@@ -25,6 +27,8 @@ export default function ParentLayout() {
   const { loading, error } = useData();
   const navigate = useNavigate();
   const { pathname } = useLocation(); // مفتاح ErrorBoundary: التنقل لصفحة ثانية يرجّعها طبيعية
+  // فتح أي صفحة يبدأ من أعلاها (المتصفح كان يحافظ على مكان التمرير من الصفحة السابقة — مثلًا زر تعبئة العبادات أسفل الرئيسية)
+  useEffect(() => window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior }), [pathname]);
   const { student } = useParentStudent();
   const [collapsed, toggleCollapsed] = useSidebarCollapsed();
 

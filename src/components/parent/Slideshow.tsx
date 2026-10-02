@@ -1,9 +1,34 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CalendarDays, ChevronLeft, ChevronRight, Images } from 'lucide-react';
 import type { Activity } from '@/types';
 import { cx, formatDate } from '@/utils/format';
 
-export default function Slideshow({ items, className }: { items: Activity[]; className?: string }) {
+interface Slide {
+  key: string;
+  url: string;
+  title: string;
+  description: string;
+  date: string;
+}
+
+/**
+ * كل صورة بالمنشور شريحة مستقلة. العنوان الرئيسي والوصف يظهران على أول صورة بالمنشور فقط،
+ * وباقي الصور تظهر بعنوانها الخاص إن وُجد، أو بدون أي نص فوقها.
+ */
+function toSlides(items: Activity[]): Slide[] {
+  return items.flatMap((a) =>
+    (a.images.length ? a.images : [{ url: a.image }]).map((im, k) => ({
+      key: `${a.id}-${k}`,
+      url: im.url,
+      title: (im.caption?.trim() || (k === 0 ? a.title : '')) ?? '',
+      description: k === 0 ? a.description : '',
+      date: a.date,
+    })),
+  );
+}
+
+export default function Slideshow({ items: posts, className }: { items: Activity[]; className?: string }) {
+  const items = useMemo(() => toSlides(posts), [posts]);
   const [i, setI] = useState(0);
   const [paused, setPaused] = useState(false);
   const n = items.length;
@@ -34,9 +59,9 @@ export default function Slideshow({ items, className }: { items: Activity[]; cla
     >
       {items.map((a, k) => (
         <img
-          key={a.id}
-          src={a.image}
-          alt={a.title}
+          key={a.key}
+          src={a.url}
+          alt={a.title || 'صورة من أنشطة المجموعة'}
           className={cx('absolute inset-0 h-full w-full object-cover transition-all duration-[900ms]', k === i ? 'scale-100 opacity-100' : 'scale-105 opacity-0')}
         />
       ))}
@@ -46,14 +71,16 @@ export default function Slideshow({ items, className }: { items: Activity[]; cla
           <CalendarDays className="h-3.5 w-3.5" />
           {formatDate(items[i].date)}
         </span>
-        <h3 key={items[i].id} className="animate-fade-in text-[19px] font-bold sm:text-[26px] lg:text-[30px]">
-          {items[i].title}
-        </h3>
-        <p className="mt-1 line-clamp-2 max-w-3xl text-[13px] text-white/80 sm:text-[15px]">{items[i].description}</p>
+        {items[i].title && (
+          <h3 key={items[i].key} className="animate-fade-in text-[19px] font-bold sm:text-[26px] lg:text-[30px]">
+            {items[i].title}
+          </h3>
+        )}
+        {items[i].description && <p className="mt-1 line-clamp-2 max-w-3xl text-[13px] text-white/80 sm:text-[15px]">{items[i].description}</p>}
         <div className="mt-4 flex items-center justify-between">
-          <div className="flex gap-1.5">
+          <div className="flex max-w-[70%] flex-wrap gap-1.5">
             {items.map((a, k) => (
-              <button key={a.id} onClick={() => setI(k)} aria-label={`الصورة ${k + 1}`} className={cx('h-1.5 rounded-full transition-all', k === i ? 'w-6 bg-gold-300' : 'w-1.5 bg-white/40 hover:bg-white/70')} />
+              <button key={a.key} onClick={() => setI(k)} aria-label={`الصورة ${k + 1}`} className={cx('h-1.5 rounded-full transition-all', k === i ? 'w-6 bg-gold-300' : 'w-1.5 bg-white/40 hover:bg-white/70')} />
             ))}
           </div>
           {n > 1 && (

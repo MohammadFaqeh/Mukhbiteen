@@ -102,6 +102,25 @@ create table if not exists public.honor_boards (
   created_at timestamptz not null default now()
 );
 
+-- دورات التجويد لكل طالب: المجتازة + الحالية
+alter table public.students add column if not exists tajweed_completed text[] not null default '{}';
+alter table public.students add column if not exists tajweed_current text;
+
+-- سورة الكهف يوم الجمعة
+alter table public.daily_worship add column if not exists kahf boolean not null default false;
+
+-- منشورات الأنشطة: أكثر من صورة بنفس المنشور، والعنوان اختياري
+alter table public.activities add column if not exists images jsonb not null default '[]'::jsonb;
+alter table public.activities alter column title drop not null;
+
+-- مادة كل دورة تجويد (ملف PDF) — تظهر لولي أمر كل طالب مسجّل بهذه الدورة حاليًا
+create table if not exists public.tajweed_materials (
+  course text primary key check (course in ('tamheedi', 'mutawassit', 'mutaqaddim', 'itqan')),
+  pdf_url text,
+  file_name text,
+  updated_at timestamptz not null default now()
+);
+
 -- ------------------------------------------------------------------
 --  صلاحيات أساسية على الجداول (لازمة قبل RLS، وإلا "permission denied")
 --  التطبيق لا يستخدم إلا مستخدمين مسجّلين دخول (authenticated) أبدًا،
@@ -114,7 +133,8 @@ grant select, insert, update, delete on
   public.daily_worship,
   public.next_requirements,
   public.activities,
-  public.honor_boards
+  public.honor_boards,
+  public.tajweed_materials
 to authenticated;
 grant select, insert, update on public.profiles to authenticated;
 
@@ -172,6 +192,7 @@ alter table public.daily_worship enable row level security;
 alter table public.next_requirements enable row level security;
 alter table public.activities enable row level security;
 alter table public.honor_boards enable row level security;
+alter table public.tajweed_materials enable row level security;
 
 drop policy if exists "admin full access students" on public.students;
 create policy "admin full access students" on public.students for all using (public.is_admin()) with check (public.is_admin());
@@ -216,6 +237,11 @@ create policy "admin full access honor_boards" on public.honor_boards for all us
 drop policy if exists "authenticated reads published honor_boards" on public.honor_boards;
 create policy "authenticated reads published honor_boards" on public.honor_boards for select using (published = true);
 
+drop policy if exists "admin full access tajweed_materials" on public.tajweed_materials;
+create policy "admin full access tajweed_materials" on public.tajweed_materials for all using (public.is_admin()) with check (public.is_admin());
+drop policy if exists "authenticated reads tajweed_materials" on public.tajweed_materials;
+create policy "authenticated reads tajweed_materials" on public.tajweed_materials for select using (auth.uid() is not null);
+
 -- ------------------------------------------------------------------
 --  تخزين الصور (Storage)
 -- ------------------------------------------------------------------
@@ -239,3 +265,15 @@ drop policy if exists "admin update activity images" on storage.objects;
 create policy "admin update activity images" on storage.objects for update using (bucket_id = 'activity-images' and public.is_admin());
 drop policy if exists "admin delete activity images" on storage.objects;
 create policy "admin delete activity images" on storage.objects for delete using (bucket_id = 'activity-images' and public.is_admin());
+
+-- ملفات مواد دورات التجويد (PDF)
+insert into storage.buckets (id, name, public) values ('tajweed-materials', 'tajweed-materials', true) on conflict (id) do nothing;
+
+drop policy if exists "public read tajweed materials" on storage.objects;
+create policy "public read tajweed materials" on storage.objects for select using (bucket_id = 'tajweed-materials');
+drop policy if exists "admin write tajweed materials" on storage.objects;
+create policy "admin write tajweed materials" on storage.objects for insert with check (bucket_id = 'tajweed-materials' and public.is_admin());
+drop policy if exists "admin update tajweed materials" on storage.objects;
+create policy "admin update tajweed materials" on storage.objects for update using (bucket_id = 'tajweed-materials' and public.is_admin());
+drop policy if exists "admin delete tajweed materials" on storage.objects;
+create policy "admin delete tajweed materials" on storage.objects for delete using (bucket_id = 'tajweed-materials' and public.is_admin());

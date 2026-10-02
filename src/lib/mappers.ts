@@ -2,7 +2,7 @@
  * تحويل بين أعمدة قاعدة البيانات (snake_case) وأنواع التطبيق (camelCase).
  * الحقول المتداخلة (memorization, revision, prayers) تُخزَّن كما هي (jsonb) بلا تحويل إضافي.
  */
-import type { Activity, DailyWorship, HonorBoard, NextRequirement, SessionRecord, Student } from '@/types';
+import type { Activity, ActivityImage, DailyWorship, HonorBoard, NextRequirement, SessionRecord, Student, TajweedMaterial } from '@/types';
 import { isAssigned } from '@/utils/quran';
 
 export function studentFromRow(r: any): Student {
@@ -18,6 +18,8 @@ export function studentFromRow(r: any): Student {
     joinedAt: r.joined_at,
     notes: r.notes ?? undefined,
     active: r.active,
+    tajweedCompleted: Array.isArray(r.tajweed_completed) ? r.tajweed_completed : [],
+    tajweedCurrent: r.tajweed_current ?? undefined,
   };
 }
 
@@ -34,6 +36,8 @@ export function studentToRow(s: Partial<Student>) {
   if (s.joinedAt !== undefined) row.joined_at = s.joinedAt;
   if (s.notes !== undefined) row.notes = s.notes;
   if (s.active !== undefined) row.active = s.active;
+  if (s.tajweedCompleted !== undefined) row.tajweed_completed = s.tajweedCompleted;
+  if (s.tajweedCurrent !== undefined) row.tajweed_current = s.tajweedCurrent || null;
   return row;
 }
 
@@ -83,6 +87,7 @@ export function dailyWorshipFromRow(r: any): DailyWorship {
     wirdFromPage: r.wird_from_page ?? undefined,
     wirdToPage: r.wird_to_page ?? undefined,
     charity: r.charity,
+    kahf: r.kahf ?? false,
     notes: r.notes ?? undefined,
   };
 }
@@ -104,6 +109,7 @@ export function dailyWorshipToRow(d: DailyWorship) {
     wird_from_page: d.wirdFromPage ?? null,
     wird_to_page: d.wirdToPage ?? null,
     charity: d.charity,
+    kahf: d.kahf,
     notes: d.notes ?? null,
   };
 }
@@ -137,10 +143,13 @@ export function requirementToRow(r: NextRequirement) {
 }
 
 export function activityFromRow(r: any): Activity {
+  // سجلات قديمة (قبل دعم عدة صور): صورة واحدة بعمود image_url
+  const images: ActivityImage[] = Array.isArray(r.images) && r.images.length ? r.images : r.image_url ? [{ url: r.image_url }] : [];
   return {
     id: r.id,
-    image: r.image_url,
-    title: r.title,
+    image: images[0]?.url ?? '',
+    images,
+    title: r.title ?? '',
     description: r.description ?? '',
     date: r.date,
     durationDays: r.duration_days,
@@ -150,7 +159,10 @@ export function activityFromRow(r: any): Activity {
 export function activityToRow(a: Partial<Activity>) {
   const row: Record<string, unknown> = {};
   if (a.id !== undefined) row.id = a.id;
-  if (a.image !== undefined) row.image_url = a.image;
+  if (a.images !== undefined) {
+    row.images = a.images;
+    row.image_url = a.images[0]?.url ?? '';
+  } else if (a.image !== undefined) row.image_url = a.image;
   if (a.title !== undefined) row.title = a.title;
   if (a.description !== undefined) row.description = a.description;
   if (a.date !== undefined) row.date = a.date;
@@ -180,4 +192,12 @@ export function honorBoardToRow(h: HonorBoard) {
     entries: h.entries,
     created_at: h.createdAt,
   };
+}
+
+export function tajweedMaterialFromRow(r: any): TajweedMaterial {
+  return { course: r.course, pdfUrl: r.pdf_url ?? undefined, fileName: r.file_name ?? undefined, updatedAt: r.updated_at ?? undefined };
+}
+
+export function tajweedMaterialToRow(m: TajweedMaterial) {
+  return { course: m.course, pdf_url: m.pdfUrl ?? null, file_name: m.fileName ?? null, updated_at: m.updatedAt ?? new Date().toISOString() };
 }

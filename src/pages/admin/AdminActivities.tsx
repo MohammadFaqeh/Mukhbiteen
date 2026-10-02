@@ -1,5 +1,5 @@
 import { useState, type ChangeEvent } from 'react';
-import { CalendarDays, Clock, ImagePlus, Loader2, PencilLine, Plus, Trash2 } from 'lucide-react';
+import { CalendarDays, Clock, ImagePlus, Images, Loader2, PencilLine, Plus, Star, Trash2, X } from 'lucide-react';
 import { useData } from '@/context/DataContext';
 import { useToast } from '@/context/ToastContext';
 import PageHeader from '@/components/shared/PageHeader';
@@ -7,13 +7,13 @@ import Modal from '@/components/ui/Modal';
 import Badge from '@/components/ui/Badge';
 import Slideshow from '@/components/parent/Slideshow';
 import { Field } from '@/components/admin/fields';
-import type { Activity } from '@/types';
+import type { Activity, ActivityImage } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { TODAY } from '@/utils/today';
 import { isActivityLive } from '@/utils/stats';
 import { daysBetween, formatDate } from '@/utils/format';
 
-const blank: Omit<Activity, 'id'> = { image: '', title: '', description: '', date: TODAY, durationDays: 6 };
+const blank: Omit<Activity, 'id'> = { image: '', images: [], title: '', description: '', date: TODAY, durationDays: 6 };
 
 export default function AdminActivities() {
   const { activities, addActivity, updateActivity, deleteActivity } = useData();
@@ -35,20 +35,33 @@ export default function AdminActivities() {
     setErr('');
     setModal({ open: true, id: a.id });
   };
-  const onFile = async (e: ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
+  // رفع عدة صور دفعة واحدة — تنضاف لنفس المنشور
+  const onFiles = async (e: ChangeEvent<HTMLInputElement>) => {
+    const files = [...(e.target.files ?? [])];
+    e.target.value = '';
+    if (!files.length) return;
     setUploading(true);
-    const path = `${Date.now()}-${f.name}`;
-    const { data, error } = await supabase.storage.from('activity-images').upload(path, f, { upsert: true });
+    setErr('');
+    const added: ActivityImage[] = [];
+    for (const [k, f] of files.entries()) {
+      const ext = f.name.split('.').pop() || 'jpg';
+      // اسم لاتيني عشوائي: أسماء الملفات العربية ترفضها حاوية التخزين
+      const path = `${Date.now()}-${k}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
+      const { data, error } = await supabase.storage.from('activity-images').upload(path, f, { upsert: true });
+      if (error) {
+        setErr(`تعذّر رفع الصورة "${f.name}": ${error.message}`);
+        continue;
+      }
+      added.push({ url: supabase.storage.from('activity-images').getPublicUrl(data.path).data.publicUrl });
+    }
     setUploading(false);
-    if (error) return setErr(`تعذّر رفع الصورة: ${error.message}`);
-    const { data: pub } = supabase.storage.from('activity-images').getPublicUrl(data.path);
-    setD((x) => ({ ...x, image: pub.publicUrl }));
+    setD((x) => ({ ...x, images: [...x.images, ...added] }));
   };
+  const setCaption = (k: number, caption: string) => setD((x) => ({ ...x, images: x.images.map((im, j) => (j === k ? { ...im, caption } : im)) }));
+  const removeImage = (k: number) => setD((x) => ({ ...x, images: x.images.filter((_, j) => j !== k) }));
+  const makeMain = (k: number) => setD((x) => ({ ...x, images: [x.images[k], ...x.images.filter((_, j) => j !== k)] }));
   const save = async () => {
-    if (!d.image) return setErr('اختر صورة أولًا.');
-    if (!d.title.trim()) return setErr('اكتب عنوانًا للصورة.');
+    if (!d.images.length) return setErr('اختر صورة واحدة على الأقل.');
     setSaving(true);
     setErr('');
     try {
@@ -87,12 +100,17 @@ export default function AdminActivities() {
               <article key={a.id} className="card overflow-hidden">
                 <div className="relative aspect-[16/10] bg-navy-100">
                   <img src={a.image} alt={a.title} className="h-full w-full object-cover" />
+                  {a.images.length > 1 && (
+                    <span className="absolute bottom-3 left-3 inline-flex items-center gap-1 rounded-full bg-navy-900/70 px-2.5 py-1 text-[11px] font-bold text-white">
+                      <Images className="h-3.5 w-3.5" /> {a.images.length} صور
+                    </span>
+                  )}
                   <Badge tone={on ? 'green' : 'gray'} dot className="absolute right-3 top-3 bg-white/90">
                     {on ? `معروضة – متبقي ${left} ${left === 1 ? 'يوم' : 'أيام'}` : 'انتهت مدة العرض'}
                   </Badge>
                 </div>
                 <div className="p-4">
-                  <h3 className="font-bold text-navy-900">{a.title}</h3>
+                  <h3 className="font-bold text-navy-900">{a.title || <span className="font-normal text-navy-300">بدون عنوان</span>}</h3>
                   <p className="mt-1 line-clamp-2 text-[13px] text-navy-500">{a.description}</p>
                   <div className="mt-3 flex items-center gap-4 text-[12px] text-navy-400">
                     <span className="flex items-center gap-1">
@@ -109,7 +127,7 @@ export default function AdminActivities() {
                     <button
                       className="btn py-1.5 text-[12px] text-burgundy-600 hover:bg-burgundy-50"
                       onClick={async () => {
-                        if (!confirm('حذف هذه الصورة؟')) return;
+                        if (!confirm(a.images.length > 1 ? `حذف هذا المنشور بصوره (${a.images.length})؟` : 'حذف هذه الصورة؟')) return;
                         try {
                           await deleteActivity(a.id);
                           toast('تم حذف الصورة');
@@ -131,8 +149,9 @@ export default function AdminActivities() {
       <Modal
         open={modal.open}
         onClose={() => setModal({ open: false })}
-        title={modal.id ? 'تعديل الصورة' : 'إضافة صورة'}
-        size="lg"
+        title={modal.id ? 'تعديل المنشور' : 'إضافة صور'}
+        subtitle="تقدر ترفع أكثر من صورة مرة وحدة، والعنوان اختياري"
+        size="xl"
         footer={
           <>
             <button className="btn-ghost" onClick={() => setModal({ open: false })}>
@@ -140,21 +159,48 @@ export default function AdminActivities() {
             </button>
             <button className="btn-primary" onClick={save} disabled={saving || uploading}>
               {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-              {modal.id ? 'حفظ التعديلات' : 'إضافة الصورة'}
+              {modal.id ? 'حفظ التعديلات' : d.images.length > 1 ? `نشر ${d.images.length} صور` : 'إضافة الصورة'}
             </button>
           </>
         }
       >
         <div className="grid gap-4 sm:grid-cols-2">
-          <label className="relative flex aspect-[16/10] cursor-pointer flex-col items-center justify-center gap-2 overflow-hidden rounded-2xl border border-dashed border-navy-200 bg-navy-50/40 text-[13px] text-navy-500 hover:bg-navy-50 sm:col-span-2">
-            {uploading ? <Loader2 className="h-9 w-9 animate-spin text-navy-300" /> : d.image ? <img src={d.image} alt="" className="absolute inset-0 h-full w-full object-cover" /> : <ImagePlus className="h-9 w-9 text-navy-300" />}
-            {uploading ? 'جارٍ الرفع...' : !d.image && 'اختر صورة من جهازك'}
-            <input type="file" accept="image/*" className="sr-only" onChange={onFile} disabled={uploading} />
+          {d.images.length > 0 && (
+            <ul className="grid gap-3 sm:col-span-2 sm:grid-cols-2 lg:grid-cols-3">
+              {d.images.map((im, k) => (
+                <li key={im.url} className="overflow-hidden rounded-2xl border border-navy-100 bg-white">
+                  <div className="relative aspect-[16/10] bg-navy-50">
+                    <img src={im.url} alt="" className="h-full w-full object-cover" />
+                    {k === 0 ? (
+                      <span className="absolute right-2 top-2 rounded-full bg-gold-300 px-2 py-0.5 text-[11px] font-bold text-navy-900">الصورة الرئيسية</span>
+                    ) : (
+                      <button type="button" onClick={() => makeMain(k)} className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-white/90 px-2 py-0.5 text-[11px] font-bold text-navy-700 hover:bg-white">
+                        <Star className="h-3 w-3" /> اجعلها الرئيسية
+                      </button>
+                    )}
+                    <button type="button" onClick={() => removeImage(k)} className="absolute left-2 top-2 rounded-full bg-white/90 p-1 text-burgundy-600 hover:bg-white" aria-label="إزالة الصورة">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <input
+                    className="input rounded-none border-0 border-t border-navy-50 text-[13px]"
+                    value={im.caption ?? ''}
+                    onChange={(e) => setCaption(k, e.target.value)}
+                    placeholder={k === 0 ? 'بدون: يظهر العنوان الرئيسي' : 'عنوان لهذه الصورة (اختياري)'}
+                  />
+                </li>
+              ))}
+            </ul>
+          )}
+          <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-navy-200 bg-navy-50/40 py-6 text-[13px] text-navy-500 hover:bg-navy-50 sm:col-span-2">
+            {uploading ? <Loader2 className="h-8 w-8 animate-spin text-navy-300" /> : <ImagePlus className="h-8 w-8 text-navy-300" />}
+            {uploading ? 'جارٍ رفع الصور...' : d.images.length ? 'إضافة صور أخرى لنفس المنشور' : 'اختر صورة أو أكثر من جهازك'}
+            <input type="file" accept="image/*" multiple className="sr-only" onChange={onFiles} disabled={uploading} />
           </label>
-          <Field label="العنوان" className="sm:col-span-2">
+          <Field label="العنوان الرئيسي (اختياري — يظهر على الصورة الرئيسية فقط)" className="sm:col-span-2">
             <input className="input" value={d.title} onChange={(e) => setD({ ...d, title: e.target.value })} placeholder="جانب من لقاء اليوم" />
           </Field>
-          <Field label="الوصف" className="sm:col-span-2">
+          <Field label="الوصف (اختياري)" className="sm:col-span-2">
             <textarea className="input min-h-[70px]" value={d.description} onChange={(e) => setD({ ...d, description: e.target.value })} />
           </Field>
           <Field label="تاريخ النشر">

@@ -11,6 +11,7 @@ import ParentQuran from './pages/parent/ParentQuran';
 import ParentWorship from './pages/parent/ParentWorship';
 import ParentSessions from './pages/parent/ParentSessions';
 import ParentReports from './pages/parent/ParentReports';
+import ParentTajweed from './pages/parent/ParentTajweed';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminStudents from './pages/admin/AdminStudents';
 import AdminStudentDetail from './pages/admin/AdminStudentDetail';
@@ -18,6 +19,7 @@ import AdminAttendance from './pages/admin/AdminAttendance';
 import AdminActivities from './pages/admin/AdminActivities';
 import AdminReports from './pages/admin/AdminReports';
 import AdminImport from './pages/admin/AdminImport';
+import AdminTajweed from './pages/admin/AdminTajweed';
 
 function RequireRole({ role, children }: { role: Role; children: ReactElement }) {
   const { user } = useAuth();
@@ -40,6 +42,7 @@ export default function App() {
         <Route path="next" element={<ParentNext />} />
         <Route path="quran" element={<ParentQuran />} />
         <Route path="worship" element={<ParentWorship />} />
+        <Route path="tajweed" element={<ParentTajweed />} />
         <Route path="sessions" element={<ParentSessions />} />
         <Route path="reports" element={<ParentReports />} />
       </Route>
@@ -50,6 +53,7 @@ export default function App() {
         <Route path="students/:id" element={<AdminStudentDetail />} />
         <Route path="attendance" element={<AdminAttendance />} />
         <Route path="import" element={<AdminImport />} />
+        <Route path="tajweed" element={<AdminTajweed />} />
         <Route path="activities" element={<AdminActivities />} />
         <Route path="reports" element={<AdminReports />} />
       </Route>

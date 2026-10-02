@@ -12,8 +12,8 @@ export type PrayerKey = 'fajr' | 'dhuhr' | 'asr' | 'maghrib' | 'isha';
 export type PrayerLocation = 'mosque' | 'home' | 'missed';
 
 /**
- * جدول العبادات اليومي (من السبت إلى الخميس – يوم الجمعة هو يوم الدوام بالمركز ويُقيَّم مباشرة).
- * يُعبّئ أسبوعيًا من ورقة ولي الأمر، ومستقل تمامًا عن أيام حضور المركز (SessionRecord).
+ * جدول العبادات اليومي (من السبت إلى الجمعة، والجمعة فيها قراءة سورة الكهف).
+ * يُعبّئه ولي الأمر يومًا بيوم، ومستقل تمامًا عن أيام حضور المركز (SessionRecord).
  */
 export interface DailyWorship {
   id: string; // `${studentId}-${date}`
@@ -31,7 +31,19 @@ export interface DailyWorship {
   wirdFromPage?: number; // ورد القراءة نظرًا عن المصحف
   wirdToPage?: number;
   charity: boolean; // الصدقة (مرة على الأقل بالأسبوع) – نفس القيمة تتكرر على كل أيام أسبوعها
+  kahf: boolean; // قراءة سورة الكهف (يوم الجمعة فقط)
   notes?: string;
+}
+
+/** دورات التجويد بالترتيب */
+export type TajweedCourse = 'tamheedi' | 'mutawassit' | 'mutaqaddim' | 'itqan';
+
+/** مادة دورة التجويد (ملف PDF يرفعه المشرف ويظهر لولي أمر كل طالب مسجّل بالدورة) */
+export interface TajweedMaterial {
+  course: TajweedCourse;
+  pdfUrl?: string;
+  fileName?: string;
+  updatedAt?: string;
 }
 
 export interface Student {
@@ -46,6 +58,8 @@ export interface Student {
   joinedAt: string;
   notes?: string;
   active: boolean;
+  tajweedCompleted?: TajweedCourse[]; // دورات التجويد التي اجتازها
+  tajweedCurrent?: TajweedCourse; // الدورة المسجّل فيها حاليًا
 }
 
 /**
@@ -100,9 +114,20 @@ export interface NextRequirement {
   updatedAt: string;
 }
 
+/** صورة ضمن منشور الأنشطة — العنوان اختياري لكل صورة */
+export interface ActivityImage {
+  url: string;
+  caption?: string;
+}
+
+/**
+ * منشور بالسلايد شو: صورة أو أكثر مرفوعة معًا. العنوان الرئيسي اختياري ويظهر على أول صورة فقط،
+ * وكل صورة ممكن يكون لها عنوانها الخاص (أو بدون عنوان).
+ */
 export interface Activity {
   id: string;
-  image: string;
+  image: string; // أول صورة (للتوافق مع السجلات القديمة)
+  images: ActivityImage[];
   title: string;
   description: string;
   date: string; // تاريخ النشر
