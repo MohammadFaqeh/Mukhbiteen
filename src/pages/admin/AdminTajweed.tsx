@@ -1,5 +1,5 @@
 import { useMemo, useState, type ChangeEvent } from 'react';
-import { CheckCircle2, ExternalLink, FileUp, Loader2, ScrollText, UserCheck, Wand2 } from 'lucide-react';
+import { ArrowUpCircle, CheckCircle2, ExternalLink, FileUp, Loader2, ScrollText, UserCheck, Wand2 } from 'lucide-react';
 import { useData } from '@/context/DataContext';
 import { useToast } from '@/context/ToastContext';
 import PageHeader from '@/components/shared/PageHeader';
@@ -8,7 +8,7 @@ import Avatar from '@/components/ui/Avatar';
 import Select from '@/components/ui/Select';
 import { supabase } from '@/lib/supabase';
 import type { Student, TajweedCourse } from '@/types';
-import { TAJWEED_COURSES, matchRoster, sortCourses, tajweedLabel } from '@/data/tajweed';
+import { TAJWEED_COURSES, courseMaterial, matchRoster, nextCourse, sortCourses, tajweedLabel } from '@/data/tajweed';
 import { cx, formatDate } from '@/utils/format';
 
 const BUCKET = 'tajweed-materials';
@@ -22,7 +22,7 @@ export default function AdminTajweed() {
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const active = useMemo(() => students.filter((s) => s.active), [students]);
-  const material = (c: TajweedCourse) => tajweedMaterials.find((m) => m.course === c);
+  const material = (c: TajweedCourse) => courseMaterial(c, tajweedMaterials);
 
   const upload = async (course: TajweedCourse, e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -35,7 +35,7 @@ export default function AdminTajweed() {
       const { data, error } = await supabase.storage.from(BUCKET).upload(path, f, { upsert: true, contentType: 'application/pdf' });
       if (error) throw new Error(`تعذّر رفع الملف: ${error.message}`);
       const url = supabase.storage.from(BUCKET).getPublicUrl(data.path).data.publicUrl;
-      const old = material(course)?.pdfUrl;
+      const old = material(course).isDefault ? undefined : material(course).pdfUrl;
       await saveTajweedMaterial({ course, pdfUrl: url, fileName: f.name });
       const marker = `/storage/v1/object/public/${BUCKET}/`;
       if (old?.includes(marker)) await supabase.storage.from(BUCKET).remove([decodeURIComponent(old.split(marker)[1])]);
@@ -56,6 +56,15 @@ export default function AdminTajweed() {
     } finally {
       setBusyId(null);
     }
+  };
+
+  /** أنهى الطالب دورته الحالية: تُضاف للمجتازة وينتقل تلقائيًا للدورة التالية (ويظهر هذا فورًا لولي الأمر) */
+  const promote = (s: Student) => {
+    const cur = s.tajweedCurrent;
+    if (!cur) return;
+    const next = nextCourse(cur);
+    save(s, { tajweedCompleted: sortCourses([...(s.tajweedCompleted ?? []), cur]), tajweedCurrent: next });
+    toast(next ? `${s.name}: اجتاز ${tajweedLabel(cur)} وانتقل إلى ${tajweedLabel(next)}` : `${s.name}: أنهى ${tajweedLabel(cur)} — أتمّ جميع الدورات`);
   };
 
   const toggleCompleted = (s: Student, c: TajweedCourse) => {
@@ -93,10 +102,13 @@ export default function AdminTajweed() {
                   <p className="text-[12px] text-navy-400">{count ? `${count} طالب يدرسها حاليًا` : 'لا يوجد طلاب فيها حاليًا'}</p>
                 </div>
               </div>
-              {m?.pdfUrl ? (
+              {m.pdfUrl ? (
                 <a href={m.pdfUrl} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-[12px] font-medium text-emerald-800 hover:bg-emerald-100">
                   <CheckCircle2 className="h-4 w-4 shrink-0" />
-                  <span className="min-w-0 flex-1 truncate">{m.fileName ?? 'مادة الدورة'}</span>
+                  <span className="min-w-0 flex-1 truncate">
+                    {m.fileName ?? 'مادة الدورة'}
+                    {m.isDefault && <span className="block text-[11px] font-normal text-emerald-700/80">الملف الأصلي المرفق مع الموقع</span>}
+                  </span>
                   <ExternalLink className="h-3.5 w-3.5 shrink-0" />
                 </a>
               ) : (
@@ -104,10 +116,10 @@ export default function AdminTajweed() {
               )}
               <label className={cx('btn-soft mt-auto cursor-pointer text-[13px]', uploading && 'pointer-events-none opacity-60')}>
                 {uploading === key ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
-                {m?.pdfUrl ? 'استبدال الملف' : 'رفع ملف PDF'}
+                {m.isDefault ? 'رفع نسخة أحدث' : 'استبدال الملف'}
                 <input type="file" accept="application/pdf,.pdf" className="sr-only" onChange={(e) => upload(key, e)} disabled={!!uploading} />
               </label>
-              {m?.updatedAt && <p className="-mt-1 text-center text-[11px] text-navy-300">آخر تحديث {formatDate(m.updatedAt.slice(0, 10))}</p>}
+              {!m.isDefault && m.updatedAt && <p className="-mt-1 text-center text-[11px] text-navy-300">آخر تحديث {formatDate(m.updatedAt.slice(0, 10))}</p>}
             </article>
           );
         })}
@@ -117,15 +129,16 @@ export default function AdminTajweed() {
       <section className="card overflow-hidden">
         <div className="border-b border-navy-50 px-5 py-4">
           <h3 className="section-title">دورات الطلاب</h3>
-          <p className="text-[12px] text-navy-400">اضغط على الدورة لتعليمها مجتازة، واختر الدورة الحالية — يُحفظ التغيير مباشرة ويظهر لولي الأمر</p>
+          <p className="text-[12px] text-navy-400">لما يُنهي الطالب دورته اضغط "اجتاز الدورة" فتنضاف للمجتازة وينتقل للدورة التالية تلقائيًا — أو عدّل يدويًا. كل تغيير يُحفظ مباشرة ويظهر لولي الأمر</p>
         </div>
         <div className="scrollbar-thin overflow-x-auto">
-          <table className="w-full min-w-[780px] text-[13px]">
+          <table className="w-full min-w-[920px] text-[13px]">
             <thead className="bg-navy-50/60 text-right text-[12px] text-navy-500">
               <tr>
                 <th className="px-5 py-3 font-medium">الطالب</th>
                 <th className="px-3 py-3 font-medium">الدورات المجتازة</th>
                 <th className="w-52 px-3 py-3 font-medium">الدورة الحالية</th>
+                <th className="w-40 px-3 py-3" />
               </tr>
             </thead>
             <tbody>
@@ -165,6 +178,13 @@ export default function AdminTajweed() {
                         onChange={(v) => save(s, { tajweedCurrent: (v || undefined) as TajweedCourse | undefined })}
                         options={[{ value: '', label: 'غير مسجّل بدورة' }, ...TAJWEED_COURSES.filter((c) => !done.includes(c.key)).map((c) => ({ value: c.key, label: c.label }))]}
                       />
+                    </td>
+                    <td className="px-3 py-2.5">
+                      {s.tajweedCurrent && (
+                        <button className="btn-soft w-full px-3 py-1.5 text-[12px] text-emerald-800" disabled={busyId === s.id} onClick={() => promote(s)}>
+                          <ArrowUpCircle className="h-4 w-4" /> اجتاز الدورة
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );

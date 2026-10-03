@@ -2,7 +2,7 @@ import { Check, Download, ExternalLink, GraduationCap, ScrollText } from 'lucide
 import { useData } from '@/context/DataContext';
 import { useParentStudent } from '@/hooks/useParentStudent';
 import PageHeader from '@/components/shared/PageHeader';
-import { TAJWEED_COURSES, tajweedLabel } from '@/data/tajweed';
+import { TAJWEED_COURSES, courseMaterial, tajweedLabel } from '@/data/tajweed';
 import { cx } from '@/utils/format';
 
 /** التجويد لولي الأمر: مسار الدورات (المجتازة والحالية) ومادة الدورة الحالية للتحميل */
@@ -12,7 +12,7 @@ export default function ParentTajweed() {
   if (!student) return null;
   const done = student.tajweedCompleted ?? [];
   const current = student.tajweedCurrent;
-  const material = tajweedMaterials.find((m) => m.course === current);
+  const material = current ? courseMaterial(current, tajweedMaterials) : undefined;
 
   return (
     <div>

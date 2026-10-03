@@ -1,4 +1,4 @@
-import type { Student, TajweedCourse } from '@/types';
+import type { Student, TajweedCourse, TajweedMaterial } from '@/types';
 
 /** دورات التجويد بالترتيب من الأولى للأخيرة */
 export const TAJWEED_COURSES: { key: TajweedCourse; label: string }[] = [
@@ -11,6 +11,19 @@ export const TAJWEED_COURSES: { key: TajweedCourse; label: string }[] = [
 export const tajweedLabel = (k?: TajweedCourse) => TAJWEED_COURSES.find((c) => c.key === k)?.label ?? '—';
 
 const ORDER = TAJWEED_COURSES.map((c) => c.key);
+
+/** الدورة التي تلي هذه الدورة (undefined بعد دورة الإتقان) */
+export const nextCourse = (k: TajweedCourse) => ORDER[ORDER.indexOf(k) + 1];
+
+/**
+ * مادة الدورة: الملف الذي رفعه المشرف إن وُجد، وإلا الملف الافتراضي المرفق مع الموقع (public/tajweed).
+ * default=true يعني أنه الملف الأصلي وليس رفعًا من المشرف.
+ */
+export function courseMaterial(course: TajweedCourse, uploaded: TajweedMaterial[]): TajweedMaterial & { isDefault: boolean } {
+  const up = uploaded.find((m) => m.course === course && m.pdfUrl);
+  if (up) return { ...up, isDefault: false };
+  return { course, pdfUrl: `${import.meta.env.BASE_URL}tajweed/${course}.pdf`, fileName: `${tajweedLabel(course)}.pdf`, isDefault: true };
+}
 export const sortCourses = (list: TajweedCourse[]) => [...new Set(list)].sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b));
 
 /** كشف دورات التجويد كما سلّمه المشرف (بيانات-الطلاب.pdf) — يُطابَق مع الطلاب بالاسم */
