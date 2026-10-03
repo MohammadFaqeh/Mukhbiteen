@@ -28,7 +28,9 @@ export default function ParentLayout() {
   const navigate = useNavigate();
   const { pathname } = useLocation(); // مفتاح ErrorBoundary: التنقل لصفحة ثانية يرجّعها طبيعية
   // فتح أي صفحة يبدأ من أعلاها (المتصفح كان يحافظ على مكان التمرير من الصفحة السابقة — مثلًا زر تعبئة العبادات أسفل الرئيسية)
-  useEffect(() => window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior }), [pathname]);
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior }); // بأقواس: scrollTo بالمتصفحات الحديثة يرجّع Promise، وReact يعتبر أي قيمة راجعة دالة تنظيف ويستدعيها فينهار الموقع
+  }, [pathname]);
   const { student } = useParentStudent();
   const [collapsed, toggleCollapsed] = useSidebarCollapsed();
 

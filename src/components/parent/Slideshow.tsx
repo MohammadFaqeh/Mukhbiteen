@@ -38,7 +38,9 @@ export default function Slideshow({ items: posts, className }: { items: Activity
     const t = setInterval(() => setI((x) => (x + 1) % n), 5500);
     return () => clearInterval(t);
   }, [n, paused]);
-  useEffect(() => setI(0), [n]);
+  useEffect(() => {
+    setI(0);
+  }, [n]);
 
   if (!n)
     return (

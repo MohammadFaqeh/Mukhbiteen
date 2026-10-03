@@ -60,7 +60,9 @@ function NavList({ items, onNavigate, tone, collapsed }: { items: NavItem[]; onN
 export default function Sidebar({ items, onLogout, footer, tone, subtitle, collapsed, onToggleCollapsed }: Props) {
   const [open, setOpen] = useState(false);
   const loc = useLocation();
-  useEffect(() => setOpen(false), [loc.pathname]);
+  useEffect(() => {
+    setOpen(false);
+  }, [loc.pathname]);
 
   const inner = (onNavigate?: () => void, showCollapseToggle?: boolean, isCollapsed?: boolean) => (
     <div className="flex h-full flex-col">
