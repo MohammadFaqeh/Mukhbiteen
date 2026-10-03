@@ -45,22 +45,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true;
 
-    supabase.auth.getSession().then(async ({ data }) => {
-      const session = data.session;
-      const profile = session?.user ? await loadProfile(session.user.id, session.user.email ?? '') : null;
-      if (active) {
-        setUser(profile);
-        setLoading(false);
-      }
-    });
+    supabase.auth
+      .getSession()
+      .then(async ({ data }) => {
+        const session = data.session;
+        const profile = session?.user ? await loadProfile(session.user.id, session.user.email ?? '') : null;
+        if (active) setUser(profile);
+      })
+      .catch((e) => console.error('تعذّر قراءة جلسة الدخول', e))
+      .finally(() => {
+        if (active) setLoading(false);
+      });
 
-    const { data: sub } = supabase.auth.onAuthStateChange(async (event, session) => {
+    // مهم: هذا الاستدعاء لازم يكون متزامنًا وما ينتظر أي طلب Supabase بداخله.
+    // Supabase يستدعيه وهو ماسك قفل الجلسة (المشترك بين كل تبويبات الموقع)، فلو انتظرنا هون طلب ثاني لـ Supabase
+    // يعلق القفل للأبد — وكل صفحة تنفتح بعدها تضل على "جارٍ التحميل" لحد ما المستخدم يعمل تحديث.
+    // لذلك نؤجّل قراءة الملف الشخصي لبعد ما يحرر Supabase القفل (setTimeout).
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       // Supabase يعيد التحقق من الجلسة تلقائيًا كل ما رجع تبويب/نافذة الموقع يصير مرئي (حتى لو ما تغيّر شي فعليًا)،
       // ويصدر حدث مثل TOKEN_REFRESHED بنفس الهوية. تجاهله هون يمنع إعادة تحميل كل بيانات الموقع ومسح أي تعديل غير محفوظ.
       if (event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') return;
-      const profile = session?.user ? await loadProfile(session.user.id, session.user.email ?? '') : null;
-      if (!active) return;
-      setUser((prev) => (sameIdentity(prev, profile) ? prev : profile));
+      const u = session?.user;
+      setTimeout(async () => {
+        const profile = u ? await loadProfile(u.id, u.email ?? '') : null;
+        if (!active) return;
+        // جلسة موجودة بس تعذّرت قراءة الملف (انقطاع لحظي بالنت): نخلي المستخدم داخل بدل ما نطلّعه
+        if (u && !profile) return;
+        setUser((prev) => (sameIdentity(prev, profile) ? prev : profile));
+      }, 0);
     });
 
     return () => {
