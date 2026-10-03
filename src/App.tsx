@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
-import type { ReactElement } from 'react';
+import { useEffect, type ReactElement } from 'react';
 import { useAuth } from './context/AuthContext';
 import type { Role } from './types';
 import LoginPage from './pages/LoginPage';
@@ -30,6 +30,10 @@ function RequireRole({ role, children }: { role: Role; children: ReactElement })
 
 export default function App() {
   const { user, loading } = useAuth();
+  // نخبر حارس التحميل (بـ index.html) إن الموقع اشتغل، فما يعيد تحميل الصفحة
+  useEffect(() => {
+    if (!loading) (window as Window & { __appReady?: boolean }).__appReady = true;
+  }, [loading]);
   if (loading) {
     return <div className="flex min-h-screen items-center justify-center text-navy-400">جارٍ التحميل...</div>;
   }

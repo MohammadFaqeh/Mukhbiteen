@@ -8,7 +8,38 @@
     <title>مشروع المخبتين القرآني – مركز كفرأبيل القرآني</title>
   </head>
   <body>
-    <div id="root"></div>
+    <!-- نص مؤقت يظهر قبل ما يشتغل React، حتى الصفحة ما تكون فاضية أبدًا (React يستبدله أول ما يشتغل) -->
+    <div id="root"><div style="display:flex;min-height:100vh;align-items:center;justify-content:center;color:#8a93a6;font-family:sans-serif">جارٍ التحميل...</div></div>
+    <script>
+      // حارس التحميل: أحيانًا المتصفح يعلق على نسخة قديمة/عالقة من ملفات الموقع بذاكرته المؤقتة (خصوصًا بعد نشر تحديث)،
+      // فتضل الصفحة فاضية لحد ما المستخدم يعمل Ctrl+F5. هون نعمل نفس الشي تلقائيًا:
+      // لو الموقع ما اشتغل خلال 8 ثواني، أو فشل تحميل ملف الكود، نجيب الملفات من السيرفر من جديد (متجاوزين الذاكرة المؤقتة) ونعيد التحميل.
+      // React يضع window.__appReady = true لما تجهز الصفحة. ما نعيد التحميل أكثر من مرة كل دقيقة حتى ما ندخل بحلقة.
+      (function () {
+        var KEY = 'appHardReloadAt';
+        function hardReload(reason) {
+          if (window.__appReady) return;
+          try {
+            var last = Number(sessionStorage.getItem(KEY) || 0);
+            if (Date.now() - last < 60000) return;
+            sessionStorage.setItem(KEY, String(Date.now()));
+          } catch (e) {}
+          console.warn('الموقع ما اشتغل (' + reason + ') — إعادة تحميل من السيرفر');
+          var urls = [location.href];
+          var scripts = document.querySelectorAll('script[type="module"][src], link[rel="stylesheet"][href]');
+          for (var i = 0; i < scripts.length; i++) urls.push(scripts[i].src || scripts[i].href);
+          Promise.all(urls.map(function (u) { return fetch(u, { cache: 'reload' }).catch(function () {}); }))
+            .then(function () { location.reload(); });
+        }
+        window.__hardReload = hardReload;
+        window.addEventListener('error', function (e) {
+          var t = e.target;
+          if (t && t.tagName === 'SCRIPT') hardReload('فشل تحميل ملف الكود');
+        }, true);
+        window.addEventListener('vite:preloadError', function () { hardReload('فشل تحميل جزء من الكود'); });
+        setTimeout(function () { hardReload('انتهت المهلة'); }, 8000);
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
