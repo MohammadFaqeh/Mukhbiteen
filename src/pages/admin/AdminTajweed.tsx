@@ -88,7 +88,7 @@ export default function AdminTajweed() {
 
       {/* مواد الدورات */}
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {TAJWEED_COURSES.map(({ key, label }) => {
+        {TAJWEED_COURSES.filter((c) => c.hasMaterial).map(({ key, label }) => {
           const m = material(key);
           const count = active.filter((s) => s.tajweedCurrent === key).length;
           return (

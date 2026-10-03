@@ -2,7 +2,7 @@ import { Check, Download, ExternalLink, GraduationCap, ScrollText } from 'lucide
 import { useData } from '@/context/DataContext';
 import { useParentStudent } from '@/hooks/useParentStudent';
 import PageHeader from '@/components/shared/PageHeader';
-import { TAJWEED_COURSES, courseMaterial, tajweedLabel } from '@/data/tajweed';
+import { TAJWEED_COURSES, courseMaterial, hasMaterial, tajweedLabel } from '@/data/tajweed';
 import { cx } from '@/utils/format';
 
 /** التجويد لولي الأمر: مسار الدورات (المجتازة والحالية) ومادة الدورة الحالية للتحميل */
@@ -12,7 +12,7 @@ export default function ParentTajweed() {
   if (!student) return null;
   const done = student.tajweedCompleted ?? [];
   const current = student.tajweedCurrent;
-  const material = current ? courseMaterial(current, tajweedMaterials) : undefined;
+  const material = current && hasMaterial(current) ? courseMaterial(current, tajweedMaterials) : undefined;
 
   return (
     <div>
@@ -30,7 +30,9 @@ export default function ParentTajweed() {
               <p className="text-[20px] font-extrabold text-navy-900">{current ? tajweedLabel(current) : 'غير مسجّل بدورة حاليًا'}</p>
             </div>
           </div>
+          {current === 'ijaza' && <p className="text-[14px] leading-7 text-navy-600">ما شاء الله، أتمّ ابنك دورات التجويد ويتهيّأ الآن للإجازة.</p>}
           {current &&
+            current !== 'ijaza' &&
             (material?.pdfUrl ? (
               <>
                 <p className="text-[14px] leading-7 text-navy-600">هذه مادة الدورة التي يدرسها ابنك حاليًا، يمكنك فتحها أو تحميلها لمتابعة الدروس معه.</p>

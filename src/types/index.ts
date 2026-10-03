@@ -36,7 +36,7 @@ export interface DailyWorship {
 }
 
 /** دورات التجويد بالترتيب */
-export type TajweedCourse = 'tamheedi' | 'mutawassit' | 'mutaqaddim' | 'itqan';
+export type TajweedCourse = 'tamheedi' | 'mutawassit' | 'mutaqaddim' | 'itqan' | 'ijaza';
 
 /** مادة دورة التجويد (ملف PDF يرفعه المشرف ويظهر لولي أمر كل طالب مسجّل بالدورة) */
 export interface TajweedMaterial {

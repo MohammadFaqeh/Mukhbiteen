@@ -1,18 +1,21 @@
 import type { Student, TajweedCourse, TajweedMaterial } from '@/types';
 
-/** دورات التجويد بالترتيب من الأولى للأخيرة */
-export const TAJWEED_COURSES: { key: TajweedCourse; label: string }[] = [
-  { key: 'tamheedi', label: 'الدورة التمهيدية' },
-  { key: 'mutawassit', label: 'الدورة المتوسطة' },
-  { key: 'mutaqaddim', label: 'الدورة المتقدمة' },
-  { key: 'itqan', label: 'دورة الإتقان' },
+/** دورات التجويد بالترتيب من الأولى للأخيرة — الإجازة مرحلة بعد الإتقان وليس لها ملف مادة */
+export const TAJWEED_COURSES: { key: TajweedCourse; label: string; hasMaterial: boolean }[] = [
+  { key: 'tamheedi', label: 'الدورة التمهيدية', hasMaterial: true },
+  { key: 'mutawassit', label: 'الدورة المتوسطة', hasMaterial: true },
+  { key: 'mutaqaddim', label: 'الدورة المتقدمة', hasMaterial: true },
+  { key: 'itqan', label: 'دورة الإتقان', hasMaterial: true },
+  { key: 'ijaza', label: 'الإجازة', hasMaterial: false },
 ];
+
+export const hasMaterial = (k: TajweedCourse) => !!TAJWEED_COURSES.find((c) => c.key === k)?.hasMaterial;
 
 export const tajweedLabel = (k?: TajweedCourse) => TAJWEED_COURSES.find((c) => c.key === k)?.label ?? '—';
 
 const ORDER = TAJWEED_COURSES.map((c) => c.key);
 
-/** الدورة التي تلي هذه الدورة (undefined بعد دورة الإتقان) */
+/** الدورة التي تلي هذه الدورة (undefined بعد الإجازة) */
 export const nextCourse = (k: TajweedCourse) => ORDER[ORDER.indexOf(k) + 1];
 
 /**
