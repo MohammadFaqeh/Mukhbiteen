@@ -38,12 +38,23 @@ export interface DailyWorship {
 /** دورات التجويد بالترتيب */
 export type TajweedCourse = 'tamheedi' | 'mutawassit' | 'mutaqaddim' | 'itqan' | 'ijaza';
 
-/** مادة دورة التجويد (ملف PDF يرفعه المشرف ويظهر لولي أمر كل طالب مسجّل بالدورة) */
+/** فصل من فصول دورة التجويد — date = تاريخ إعطائه للطلاب (فاضي = لسا ما انأخذ) */
+export interface TajweedChapter {
+  id: string;
+  title: string;
+  date?: string; // YYYY-MM-DD
+}
+
+/**
+ * مادة دورة التجويد (ملف PDF يرفعه المشرف ويظهر لولي أمر كل طالب مسجّل بالدورة)
+ * + فصولها: ثابتة للدورة كلها (مش لكل طالب) — كل طالب مسجّل بالدورة يتبعها تلقائيًا.
+ */
 export interface TajweedMaterial {
   course: TajweedCourse;
   pdfUrl?: string;
   fileName?: string;
   updatedAt?: string;
+  chapters?: TajweedChapter[];
 }
 
 export interface Student {

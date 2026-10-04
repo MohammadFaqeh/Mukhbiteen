@@ -6,16 +6,13 @@ import StatCard from '@/components/ui/StatCard';
 import ScoreChart from '@/components/ui/ScoreChart';
 import Avatar from '@/components/ui/Avatar';
 import { AttendanceBadge } from '@/components/ui/Badge';
-import AdminStudentCard from '@/components/admin/AdminStudentCard';
 import StudentFormModal from '@/components/admin/StudentFormModal';
-import type { Student } from '@/types';
 import { TODAY } from '@/utils/today';
 import { attendanceRate, studentStats } from '@/utils/stats';
 import { formatDate, pct, round1 } from '@/utils/format';
 
 export default function AdminDashboard() {
   const { students, sessions, dailyWorship } = useData();
-  const [editing, setEditing] = useState<Student | null>(null);
   const [adding, setAdding] = useState(false);
 
   const data = useMemo(() => {
@@ -103,21 +100,7 @@ export default function AdminDashboard() {
         </section>
       </div>
 
-      <section>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-[18px] font-extrabold text-navy-900">الطلاب</h2>
-          <Link to="/admin/students" className="text-[13px] font-bold text-burgundy-600 hover:underline">
-            إدارة الطلاب
-          </Link>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-          {data.stats.map(({ s, st }, i) => (
-            <AdminStudentCard key={s.id} student={s} stats={st} rank={i + 1} onEdit={() => setEditing(s)} />
-          ))}
-        </div>
-      </section>
-
-      <StudentFormModal open={!!editing || adding} student={editing} onClose={() => { setEditing(null); setAdding(false); }} />
+      <StudentFormModal open={adding} student={null} onClose={() => setAdding(false)} />
     </div>
   );
 }

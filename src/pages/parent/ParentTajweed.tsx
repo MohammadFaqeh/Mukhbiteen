@@ -3,7 +3,7 @@ import { useData } from '@/context/DataContext';
 import { useParentStudent } from '@/hooks/useParentStudent';
 import PageHeader from '@/components/shared/PageHeader';
 import { TAJWEED_COURSES, courseMaterial, hasMaterial, tajweedLabel } from '@/data/tajweed';
-import { cx } from '@/utils/format';
+import { cx, formatDate } from '@/utils/format';
 
 /** التجويد لولي الأمر: مسار الدورات (المجتازة والحالية) ومادة الدورة الحالية للتحميل */
 export default function ParentTajweed() {
@@ -13,6 +13,8 @@ export default function ParentTajweed() {
   const done = student.tajweedCompleted ?? [];
   const current = student.tajweedCurrent;
   const material = current && hasMaterial(current) ? courseMaterial(current, tajweedMaterials) : undefined;
+  const chapters = tajweedMaterials.find((m) => m.course === current)?.chapters ?? [];
+  const given = chapters.filter((c) => c.date).length;
 
   return (
     <div>
@@ -82,6 +84,29 @@ export default function ParentTajweed() {
             })}
           </ol>
         </section>
+
+        {/* فصول الدورة الحالية: اللي انأخذت وتاريخها، واللي لسا */}
+        {current && chapters.length > 0 && (
+          <section className="card p-5 lg:col-span-12">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="section-title">فصول {tajweedLabel(current)}</h3>
+              <span className="text-[13px] text-navy-500">
+                أخذ <b className="text-navy-900">{given}</b> من <b className="text-navy-900">{chapters.length}</b> فصول
+              </span>
+            </div>
+            <ol className="grid gap-2 sm:grid-cols-2">
+              {chapters.map((c, i) => (
+                <li key={c.id} className={cx('flex items-center gap-3 rounded-xl border px-3 py-2.5', c.date ? 'border-emerald-200 bg-emerald-50/60' : 'border-navy-100 bg-white')}>
+                  <span className={cx('flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[12px] font-bold', c.date ? 'bg-emerald-600 text-white' : 'bg-navy-50 text-navy-400')}>
+                    {c.date ? <Check className="h-4 w-4" /> : i + 1}
+                  </span>
+                  <span className={cx('min-w-0 flex-1 text-[14px]', c.date ? 'font-bold text-navy-900' : 'text-navy-500')}>{c.title}</span>
+                  <span className="shrink-0 text-[12px] text-navy-400">{c.date ? formatDate(c.date) : 'لاحقًا'}</span>
+                </li>
+              ))}
+            </ol>
+          </section>
+        )}
       </div>
     </div>
   );

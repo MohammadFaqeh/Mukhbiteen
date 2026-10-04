@@ -195,7 +195,13 @@ export function honorBoardToRow(h: HonorBoard) {
 }
 
 export function tajweedMaterialFromRow(r: any): TajweedMaterial {
-  return { course: r.course, pdfUrl: r.pdf_url ?? undefined, fileName: r.file_name ?? undefined, updatedAt: r.updated_at ?? undefined };
+  return {
+    course: r.course,
+    pdfUrl: r.pdf_url ?? undefined,
+    fileName: r.file_name ?? undefined,
+    updatedAt: r.updated_at ?? undefined,
+    chapters: Array.isArray(r.chapters) ? r.chapters : [],
+  };
 }
 
 export function tajweedMaterialToRow(m: TajweedMaterial) {

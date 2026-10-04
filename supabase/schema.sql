@@ -120,6 +120,8 @@ create table if not exists public.tajweed_materials (
   file_name text,
   updated_at timestamptz not null default now()
 );
+-- فصول كل دورة وتاريخ إعطاء كل فصل: [{ "id", "title", "date" }] — ثابتة للدورة، وكل طالب مسجّل فيها يتبعها
+alter table public.tajweed_materials add column if not exists chapters jsonb not null default '[]'::jsonb;
 
 -- ------------------------------------------------------------------
 --  صلاحيات أساسية على الجداول (لازمة قبل RLS، وإلا "permission denied")

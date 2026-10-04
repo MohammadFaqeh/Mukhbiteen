@@ -1,5 +1,5 @@
-import { useMemo, useState, type ChangeEvent } from 'react';
-import { ArrowUpCircle, CheckCircle2, ExternalLink, FileUp, Loader2, ScrollText, UserCheck, Wand2 } from 'lucide-react';
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
+import { ArrowUpCircle, BookOpenCheck, CalendarCheck, CheckCircle2, ExternalLink, FileUp, ListPlus, Loader2, Save, ScrollText, Trash2, UserCheck, Wand2 } from 'lucide-react';
 import { useData } from '@/context/DataContext';
 import { useToast } from '@/context/ToastContext';
 import PageHeader from '@/components/shared/PageHeader';
@@ -7,9 +7,10 @@ import Modal from '@/components/ui/Modal';
 import Avatar from '@/components/ui/Avatar';
 import Select from '@/components/ui/Select';
 import { supabase } from '@/lib/supabase';
-import type { Student, TajweedCourse } from '@/types';
+import type { Student, TajweedChapter, TajweedCourse } from '@/types';
 import { TAJWEED_COURSES, courseMaterial, matchRoster, nextCourse, sortCourses, tajweedLabel } from '@/data/tajweed';
 import { cx, formatDate } from '@/utils/format';
+import { TODAY } from '@/utils/today';
 
 const BUCKET = 'tajweed-materials';
 
@@ -124,6 +125,8 @@ export default function AdminTajweed() {
           );
         })}
       </section>
+
+      <CourseChapters />
 
       {/* دورات الطلاب */}
       <section className="card overflow-hidden">
@@ -256,5 +259,129 @@ function RosterImport({ open, onClose }: { open: boolean; onClose: () => void })
         ))}
       </ul>
     </Modal>
+  );
+}
+
+/**
+ * فصول الدورة وتاريخ إعطاء كل فصل — ثابتة للدورة كلها (مش لكل طالب):
+ * كل طالب مسجّل بالدورة بيظهر بتقريره الفصول اللي انأخذت خلال فترة التقرير.
+ */
+function CourseChapters() {
+  const { students, tajweedMaterials, saveTajweedChapters } = useData();
+  const toast = useToast();
+  const courses = TAJWEED_COURSES.filter((c) => c.hasMaterial);
+  const [course, setCourse] = useState<TajweedCourse>('mutaqaddim');
+  const saved = useMemo(() => tajweedMaterials.find((m) => m.course === course)?.chapters ?? [], [tajweedMaterials, course]);
+  const [draft, setDraft] = useState<TajweedChapter[]>(saved);
+  const [newTitles, setNewTitles] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    setDraft(saved);
+  }, [saved]);
+
+  const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
+  const given = draft.filter((c) => c.date).length;
+  const enrolled = students.filter((s) => s.active && s.tajweedCurrent === course).length;
+  const patch = (id: string, p: Partial<TajweedChapter>) => setDraft((d) => d.map((c) => (c.id === id ? { ...c, ...p } : c)));
+
+  const add = () => {
+    const titles = newTitles.split(/\r?\n/).map((t) => t.trim()).filter(Boolean);
+    if (!titles.length) return;
+    const stamp = Date.now().toString(36);
+    setDraft((d) => [...d, ...titles.map((title, i) => ({ id: `${stamp}${i}`, title }))]);
+    setNewTitles('');
+  };
+
+  const save = async () => {
+    setBusy(true);
+    try {
+      await saveTajweedChapters(course, draft.filter((c) => c.title.trim()).map((c) => ({ ...c, title: c.title.trim(), date: c.date || undefined })));
+      toast(`تم حفظ فصول ${tajweedLabel(course)}`);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'تعذّر الحفظ.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="card overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-navy-50 px-5 py-4">
+        <div>
+          <h3 className="section-title flex items-center gap-2">
+            <BookOpenCheck className="h-5 w-5 text-emerald-700" /> فصول الدورة وما أخذه الطلاب
+          </h3>
+          <p className="text-[12px] text-navy-400">
+            فصول ثابتة للدورة كلها — حدّد تاريخ إعطاء كل فصل، وبيظهر تلقائيًا بتقرير كل طالب مسجّل بالدورة ({enrolled} طالب حاليًا)
+          </p>
+        </div>
+        <Select
+          className="w-52"
+          ariaLabel="الدورة"
+          value={course}
+          onChange={(v) => {
+            if (dirty && !confirm('في تعديلات غير محفوظة على هذه الدورة. تجاهلها؟')) return;
+            setCourse(v as TajweedCourse);
+          }}
+          options={courses.map((c) => ({ value: c.key, label: c.label }))}
+        />
+      </div>
+
+      <div className="space-y-3 p-5">
+        {draft.length > 0 && (
+          <p className="text-[13px] text-navy-500">
+            أُعطي <b className="text-navy-900">{given}</b> من <b className="text-navy-900">{draft.length}</b> فصول
+          </p>
+        )}
+        {draft.length === 0 ? (
+          <p className="rounded-xl bg-sand-50 px-4 py-3 text-[13px] text-navy-500">لم تُضف فصول لهذه الدورة بعد. اكتب أسماء الفصول تحت (كل فصل بسطر).</p>
+        ) : (
+          <ol className="space-y-2">
+            {draft.map((c, i) => (
+              <li key={c.id} className={cx('flex flex-wrap items-center gap-2 rounded-xl border p-2 sm:flex-nowrap', c.date ? 'border-emerald-200 bg-emerald-50/50' : 'border-navy-100 bg-white')}>
+                <span className="w-7 shrink-0 text-center text-[13px] font-bold text-navy-400">{i + 1}</span>
+                <input className="input min-w-0 flex-1 basis-48" value={c.title} onChange={(e) => patch(c.id, { title: e.target.value })} aria-label={`اسم الفصل ${i + 1}`} />
+                <input
+                  type="date"
+                  className="input w-40 shrink-0"
+                  value={c.date ?? ''}
+                  max={TODAY}
+                  onChange={(e) => patch(c.id, { date: e.target.value || undefined })}
+                  aria-label={`تاريخ إعطاء الفصل ${i + 1}`}
+                  title="تاريخ إعطاء الفصل (فاضي = لسا ما انأخذ)"
+                />
+                {!c.date && (
+                  <button className="btn-soft shrink-0 px-3 py-2 text-[12px] text-emerald-800" onClick={() => patch(c.id, { date: TODAY })}>
+                    <CalendarCheck className="h-4 w-4" /> أُعطي اليوم
+                  </button>
+                )}
+                <button className="shrink-0 rounded-lg p-2 text-burgundy-500 hover:bg-burgundy-50" aria-label="حذف الفصل" onClick={() => setDraft((d) => d.filter((x) => x.id !== c.id))}>
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </li>
+            ))}
+          </ol>
+        )}
+
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+          <textarea
+            className="input min-h-[44px] flex-1"
+            rows={2}
+            placeholder="أسماء فصول جديدة — كل فصل بسطر"
+            value={newTitles}
+            onChange={(e) => setNewTitles(e.target.value)}
+          />
+          <button className="btn-ghost shrink-0" onClick={add} disabled={!newTitles.trim()}>
+            <ListPlus className="h-4 w-4" /> إضافة
+          </button>
+        </div>
+
+        <div className="flex justify-end">
+          <button className="btn-primary px-6" onClick={save} disabled={busy || !dirty}>
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} حفظ الفصول
+          </button>
+        </div>
+      </div>
+    </section>
   );
 }

@@ -4,21 +4,19 @@
  * نبني صفحات A4 بـ HTML (حتى يظهر الخط العربي ووصل الحروف صح) ثم نحوّل كل صفحة لصورة عالية الدقة داخل ملف PDF.
  * المحتوى يُوزَّع على الصفحات كتلة كتلة (وجداول سطرًا سطرًا) فلا ينقص سطر بين صفحتين.
  */
-import type { DailyWorship, SessionRecord, Student } from '@/types';
+import type { DailyWorship, SessionRecord, Student, TajweedMaterial } from '@/types';
 import { PROJECT, supervisor } from '@/data/project';
 import { TAJWEED_COURSES, tajweedLabel } from '@/data/tajweed';
 import { attendanceRate, monthKey } from './stats';
-import { dailyWorshipScore, weekStartOf, weekWorshipScore } from './worship';
+import { dailyWorshipScore, worshipItems } from './worship';
 import { attendanceLabels, commitmentLabels, formatDate, formatDayMonth, formatMonthKey, round1, weekday } from './format';
 import { TODAY } from './today';
 
-export type ReportKind = 'month' | 'term' | 'custom';
-
 export interface ReportInput {
-  kind: ReportKind;
   student: Student;
   sessions: SessionRecord[]; // كل سجلات الطالب
   worship: DailyWorship[]; // كل عبادات الطالب
+  tajweedMaterials: TajweedMaterial[]; // لفصول دورة التجويد اللي انأخذت خلال الفترة
   from: string;
   to: string;
 }
@@ -56,10 +54,13 @@ const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 const pctOf = (a: number, b: number) => (b > 0 ? Math.min(100, round1((a / b) * 100)) : 0);
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
-export function reportTitle(kind: ReportKind, from: string) {
-  if (kind === 'month') return `التقرير الشهري — ${formatMonthKey(monthKey(from))}`;
-  if (kind === 'term') return 'التقرير الفصلي';
-  return 'تقرير متابعة الطالب';
+const REPORT_TITLE = 'تقرير متابعة الطالب';
+
+/** عدد أيام الفترة (شاملة البداية والنهاية) لحد اليوم — لبيان كم يوم عبّأ ولي الأمر من أيامها */
+function daysInPeriod(from: string, to: string) {
+  const end = to > TODAY ? TODAY : to;
+  const ms = new Date(`${end}T12:00:00`).getTime() - new Date(`${from}T12:00:00`).getTime();
+  return Math.max(1, Math.round(ms / 86400000) + 1);
 }
 
 /** حساب كل أرقام التقرير للفترة */
@@ -68,10 +69,6 @@ export function computeReport({ sessions, worship, from, to }: Pick<ReportInput,
   const scored = list.filter((s) => attended(s) && typeof s.score === 'number');
   const wDays = worship.filter((d) => d.date >= from && d.date <= to);
   const sum = (f: (s: SessionRecord) => number) => list.reduce((a, s) => a + f(s), 0);
-  const weeks = [...new Set(wDays.map((d) => weekStartOf(d.date)))].sort().map((ws) => {
-    const days = wDays.filter((d) => weekStartOf(d.date) === ws);
-    return { ws, filled: days.length, score: weekWorshipScore(days), charity: days.some((d) => d.charity), kahf: days.some((d) => d.kahf) };
-  });
   const months = [...new Set(list.map((s) => monthKey(s.date)))].sort().map((m) => {
     const ms = list.filter((s) => monthKey(s.date) === m);
     const mw = wDays.filter((d) => monthKey(d.date) === m);
@@ -104,9 +101,17 @@ export function computeReport({ sessions, worship, from, to }: Pick<ReportInput,
     revReq: round1(sum((s) => s.revision?.requiredPages ?? 0)),
     memGrade: avg(scored.filter((s) => s.memorization).map((s) => s.memorization!.grade)),
     revGrade: avg(scored.filter((s) => s.revision).map((s) => s.revision!.grade)),
-    weeks,
+    worshipItems: worshipItems(wDays),
     months,
-    notes: list.filter((s) => s.notes?.trim()).map((s) => ({ date: s.date, text: s.notes!.trim() })),
+    // كل ملاحظات المشرف المكتوبة بأيام الدوام خلال الفترة: ملاحظة اليوم + ملاحظة الحفظ + ملاحظة المراجعة
+    notes: list
+      .map((s) => ({
+        date: s.date,
+        text: [s.notes?.trim(), s.memorization?.notes?.trim() && `الحفظ: ${s.memorization.notes.trim()}`, s.revision?.notes?.trim() && `المراجعة: ${s.revision.notes.trim()}`]
+          .filter(Boolean)
+          .join(' · '),
+      }))
+      .filter((n) => n.text),
   };
 }
 
@@ -321,7 +326,7 @@ class Paginator {
 /* ---------------- بناء التقرير ---------------- */
 
 function buildPages(root: HTMLElement, input: ReportInput) {
-  const { student, kind, from, to } = input;
+  const { student, from, to, tajweedMaterials } = input;
   const r = computeReport(input);
   const p = new Paginator(root);
   const base = import.meta.env.BASE_URL;
@@ -334,7 +339,7 @@ function buildPages(root: HTMLElement, input: ReportInput) {
     <div style="width:82px;height:82px;border-radius:18px;background:#fff;display:flex;align-items:center;justify-content:center"><img src="${base}images/brand/mukhbiteen-logo.png" style="height:70px" crossorigin="anonymous"/></div>
     <div style="flex:1;text-align:center">
       <div style="font-size:13.5px;opacity:.8">${esc(PROJECT.name)} · ${esc(PROJECT.center)}</div>
-      <div style="font-size:28px;font-weight:800;margin-top:4px">${esc(reportTitle(kind, from))}</div>
+      <div style="font-size:28px;font-weight:800;margin-top:4px">${REPORT_TITLE}</div>
       <div style="display:inline-block;margin-top:8px;padding:4px 14px;border-radius:999px;background:rgba(255,255,255,.14);font-size:13px">من ${formatDate(from)} إلى ${formatDate(to)}</div>
     </div>
     <div style="width:82px;height:82px;border-radius:18px;background:#fff;display:flex;align-items:center;justify-content:center"><img src="${base}images/brand/center-logo.png" style="height:68px" crossorigin="anonymous"/></div>
@@ -383,7 +388,7 @@ function buildPages(root: HTMLElement, input: ReportInput) {
     p.add(`<div>${sectionTitle('الخلاصة لولي الأمر')}
       <div style="display:flex;gap:12px">
         ${box('نقاط القوة', '#23895A', '#EAF6EF', '✓', strong.length ? strong.map((i) => li(`${i.label}: ${fmt(i.value)}%`)).join('') : li('نحتاج تحسين المؤشرات لنصل لمستوى ممتاز بإذن الله.'))}
-        ${box('يحتاج متابعة في البيت', '#B83B3B', '#FCEEEE', '!', weak.length ? weak.map((i) => li(i.tip)).join('') : li(`ما شاء الله، أداء ${esc(first)} متميز في كل المؤشرات — شجّعوه على الاستمرار.`))}
+        ${box('يحتاج متابعة في البيت', '#B83B3B', '#FCEEEE', '!', weak.length ? weak.map((i) => li(i.tip)).join('') : li('لا شيء'))}
       </div></div>`);
   }
 
@@ -392,8 +397,8 @@ function buildPages(root: HTMLElement, input: ReportInput) {
     p.add(`<div>${sectionTitle('مسار علامات أيام الدوام', r.scored.length > 18 ? '(آخر 18 يومًا)' : '')}${scoreChart(r.scored)}</div>`);
   }
 
-  // الأداء حسب الأشهر (للتقرير الفصلي أو أي فترة أطول من شهر)
-  if (r.months.length > 1) {
+  // الأداء حسب الأشهر (لفترة أطول من شهر)
+  if (r.months.length > 1 && daysInPeriod(from, to) > 31) {
     p.table(
       sectionTitle('الأداء حسب الأشهر'),
       th('الشهر') + th('أيام الدوام', 100) + th('المعدل', 120) + th('الحضور', 100) + th('العبادات', 100),
@@ -418,6 +423,26 @@ function buildPages(root: HTMLElement, input: ReportInput) {
       </div>`;
     }).join('');
     p.add(`<div>${sectionTitle('دورات التجويد', student.tajweedCurrent ? `(حاليًا: ${tajweedLabel(student.tajweedCurrent)})` : '')}<div style="display:flex;gap:8px">${steps}</div></div>`);
+
+    // فصول الدورة الحالية اللي انأخذت خلال الفترة (ثابتة للدورة، فكل طالب مسجّل فيها يتبعها)
+    const chapters = tajweedMaterials.find((m) => m.course === student.tajweedCurrent)?.chapters ?? [];
+    if (chapters.length) {
+      const inPeriod = chapters.filter((c) => c.date && c.date >= from && c.date <= to).sort((a, b) => a.date!.localeCompare(b.date!));
+      const givenAll = chapters.filter((c) => c.date && c.date <= to).length;
+      const body = inPeriod.length
+        ? inPeriod
+            .map(
+              (c) =>
+                `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid ${C.line}"><span style="color:#23895A;font-weight:800">✓</span><span style="flex:1;font-size:13.5px;color:${C.ink}">${esc(c.title)}</span><span style="font-size:12px;color:${C.muted}">${formatDayMonth(c.date!)}</span></div>`,
+            )
+            .join('')
+        : `<div style="padding:8px 0;font-size:13.5px;color:${C.muted};border-top:1px solid ${C.line}">لم تُعطَ فصول جديدة خلال هذه الفترة</div>`;
+      p.add(`<div style="margin-top:10px;border:1px solid ${C.line};border-radius:14px;padding:10px 16px;background:#fff">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <b style="font-size:14.5px;color:${C.navy}">ما أخذه في ${esc(tajweedLabel(student.tajweedCurrent))} خلال الفترة</b>
+          <span style="font-size:12.5px;color:${C.muted}">تقدّم الدورة: ${givenAll} من ${chapters.length} فصول</span>
+        </div>${body}</div>`);
+    }
   }
 
   // أيام الدوام بالتفصيل
@@ -438,17 +463,30 @@ function buildPages(root: HTMLElement, input: ReportInput) {
     );
   }
 
-  // العبادات الأسبوعية
-  if (r.weeks.length) {
-    p.table(
-      sectionTitle('جدول العبادات الأسبوعي', '(من السبت إلى الجمعة)'),
-      th('الأسبوع', 130) + th('أيام معبّأة', 96) + th('صدقة', 64) + th('الكهف', 64) + th('علامة الأسبوع'),
-      r.weeks.map((w) => {
-        const wl = level(w.score);
-        const bar = `<div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:10px;border-radius:999px;background:#EEF1F6;overflow:hidden"><div style="height:100%;width:${Math.min(100, w.score)}%;background:${wl.c};border-radius:999px"></div></div><b style="color:${wl.c};width:52px">${fmt(w.score)}%</b></div>`;
-        return `<tr>${td(`يبدأ ${formatDayMonth(w.ws)}`)}${td(`${w.filled} من 7`)}${td(w.charity ? '✓' : '—', `color:${w.charity ? '#23895A' : C.muted};font-weight:800`)}${td(w.kahf ? '✓' : '—', `color:${w.kahf ? '#23895A' : C.muted};font-weight:800`)}${td(bar)}</tr>`;
-      }),
-    );
+  // جدول العبادات: إجمالي الفترة كاملة — المعدل العام، أكثر 3 أشياء ملتزم فيها، وكل شي تقييمه جيد أو أقل
+  if (r.worshipDays) {
+    const wl = level(r.worship);
+    const total = daysInPeriod(from, to);
+    const sorted = [...r.worshipItems].sort((a, b) => b.value - a.value);
+    const best = sorted.filter((i) => i.value >= 80).slice(0, 3);
+    const weak = sorted.filter((i) => i.value < 80).reverse();
+    const row = (i: { label: string; value: number }) => {
+      const il = level(i.value);
+      return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0"><span style="flex:1;font-size:13.5px;color:${C.ink}">${i.label}</span><b style="font-size:13px;color:${il.c}">${fmt(i.value)}%</b>${pill(il.t, il.c, il.bg)}</div>`;
+    };
+    const box = (title: string, color: string, bg: string, body: string) =>
+      `<div style="flex:1;min-width:0;border-radius:16px;background:${bg};padding:12px 16px"><div style="font-size:15px;font-weight:800;color:${color};margin-bottom:4px">${title}</div>${body}</div>`;
+    const none = `<div style="font-size:13.5px;color:${C.muted};padding:5px 0">لا شيء</div>`;
+    p.add(`<div>${sectionTitle('جدول العبادات')}
+      <div style="display:flex;align-items:center;gap:14px;border:1px solid ${C.line};border-radius:14px;padding:12px 16px;background:#fff;margin-bottom:10px">
+        <div style="font-size:15px;font-weight:800;color:${C.navy}">المعدل العام للعبادات خلال الفترة</div>
+        <div style="flex:1;font-size:12.5px;color:${C.muted}">عُبّئ ${r.worshipDays} من أصل ${total} ${total === 1 ? 'يوم' : 'أيام'}</div>
+        <b style="font-size:20px;color:${wl.c}">${fmt(r.worship)}%</b>${pill(wl.t, wl.c, wl.bg)}
+      </div>
+      <div style="display:flex;gap:12px;align-items:flex-start">
+        ${box('✓ أكثر ما يلتزم به', '#23895A', '#EAF6EF', best.length ? best.map(row).join('') : none)}
+        ${box('! يحتاج اهتمامًا أكثر', '#B83B3B', '#FCEEEE', weak.length ? weak.map(row).join('') : none)}
+      </div></div>`);
   }
 
   // ملاحظات المشرف — العنوان يبقى مع أول ملاحظة بنفس الصفحة
@@ -456,7 +494,7 @@ function buildPages(root: HTMLElement, input: ReportInput) {
   if (r.notes.length || lastCommitment) {
     const note = (n: { date: string; text: string }) =>
       `<div style="margin-bottom:7px;padding:10px 14px;border-radius:12px;background:${C.soft};border-right:4px solid ${C.gold};font-size:13.5px;line-height:1.8"><b style="color:${C.muted};font-size:12.5px">${formatDayMonth(n.date)}:</b> ${esc(n.text)}</div>`;
-    const notes = r.notes.slice(-8);
+    const notes = r.notes;
     p.add(`<div>${sectionTitle('ملاحظات المشرف')}
       ${lastCommitment ? `<p style="margin:0 0 8px;font-size:14px">الالتزام والسلوك في آخر دوام: <b style="color:${C.navy}">${commitmentLabels[lastCommitment]}</b></p>` : ''}
       ${notes[0] ? note(notes[0]) : ''}</div>`);
@@ -500,9 +538,8 @@ const waitImages = (root: HTMLElement) =>
     ),
   );
 
-export function reportFileName({ kind, student, from, to }: ReportInput) {
-  const name = student.name.replace(/\s+/g, '-');
-  return kind === 'month' ? `تقرير-${name}-${formatMonthKey(monthKey(from)).replace(' ', '-')}.pdf` : `تقرير-${name}-${from}_${to}.pdf`;
+export function reportFileName({ student, from, to }: ReportInput) {
+  return `تقرير-${student.name.replace(/\s+/g, '-')}-${from}_${to}.pdf`;
 }
 
 /** يبني ملف التقرير (jsPDF) بدون تحميله */

@@ -112,7 +112,7 @@ export default function AdminStudentDetail() {
         {tab === 'revision' && <QuranTab kind="rev" studentId={id} sessions={sessions} />}
         {tab === 'worship' && <WorshipTab studentId={id} />}
         {tab === 'next' && <NextRequirementForm studentId={id} />}
-        {tab === 'reports' && <ReportsPanel student={student} admin dense />}
+        {tab === 'reports' && <ReportsPanel student={student} />}
       </div>
 
       <StudentFormModal open={editStudent} student={student} onClose={() => setEditStudent(false)} onDeleted={() => navigate('/admin/students', { replace: true })} />

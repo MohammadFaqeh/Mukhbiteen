@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { Activity, DailyWorship, HonorBoard, NextRequirement, SessionRecord, Student, TajweedMaterial } from '@/types';
+import type { Activity, DailyWorship, HonorBoard, NextRequirement, SessionRecord, Student, TajweedChapter, TajweedCourse, TajweedMaterial } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import {
@@ -51,6 +51,7 @@ interface DataValue extends AppData {
   unpublishHonorBoard: (id: string) => Promise<void>;
   deleteHonorBoard: (id: string) => Promise<void>;
   saveTajweedMaterial: (m: TajweedMaterial) => Promise<void>;
+  saveTajweedChapters: (course: TajweedCourse, chapters: TajweedChapter[]) => Promise<void>;
 }
 
 const DataContext = createContext<DataValue | null>(null);
@@ -291,7 +292,21 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const { error: err } = await supabase.from('tajweed_materials').upsert(row, { onConflict: 'course' });
     if (err) throw schemaError(err.message, /tajweed_materials|relation|schema cache/);
     const saved = tajweedMaterialFromRow(row);
-    setData((d) => ({ ...d, tajweedMaterials: [...d.tajweedMaterials.filter((x) => x.course !== m.course), saved] }));
+    // رفع الملف ما بيلمس عمود الفصول بقاعدة البيانات، فنحافظ عليها محليًا كمان
+    setData((d) => {
+      const old = d.tajweedMaterials.find((x) => x.course === m.course);
+      return { ...d, tajweedMaterials: [...d.tajweedMaterials.filter((x) => x.course !== m.course), { ...saved, chapters: old?.chapters ?? [] }] };
+    });
+  }, []);
+
+  /** فصول الدورة فقط (بدون لمس ملف المادة) */
+  const saveTajweedChapters = useCallback(async (course: TajweedCourse, chapters: TajweedChapter[]) => {
+    const { error: err } = await supabase.from('tajweed_materials').upsert({ course, chapters }, { onConflict: 'course' });
+    if (err) throw schemaError(err.message, /chapters|tajweed_materials|relation|schema cache/);
+    setData((d) => {
+      const old = d.tajweedMaterials.find((x) => x.course === course);
+      return { ...d, tajweedMaterials: [...d.tajweedMaterials.filter((x) => x.course !== course), { ...(old ?? { course }), chapters }] };
+    });
   }, []);
 
   const value = useMemo<DataValue>(
@@ -318,6 +333,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       unpublishHonorBoard,
       deleteHonorBoard,
       saveTajweedMaterial,
+      saveTajweedChapters,
     }),
     [
       data,
@@ -342,6 +358,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       unpublishHonorBoard,
       deleteHonorBoard,
       saveTajweedMaterial,
+      saveTajweedChapters,
     ],
   );
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

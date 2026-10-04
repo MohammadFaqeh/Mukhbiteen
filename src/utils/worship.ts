@@ -96,3 +96,29 @@ export function wirdPages(d: Pick<DailyWorship, 'wirdFromPage' | 'wirdToPage'>):
   if (d.wirdFromPage == null || d.wirdToPage == null) return undefined;
   return Math.max(0, d.wirdToPage - d.wirdFromPage + 1);
 }
+
+/**
+ * التزام الطالب بكل عبادة لحالها خلال أيام معبّأة (من 100) — للتقرير: أكثر ما يلتزم فيه وما هو مقصّر فيه.
+ * الصلاة بالمسجد 100 وبالبيت 60 (نفس نسبة 10 و6 بعلامة اليوم). الصدقة تُحسب بالأسابيع، والكهف على أيام الجمعة المعبّأة.
+ */
+export function worshipItems(days: DailyWorship[]): { label: string; value: number }[] {
+  if (!days.length) return [];
+  const share = (f: (d: DailyWorship) => number) => round1((days.reduce((a, d) => a + f(d), 0) / days.length) * 100);
+  const items = [
+    ...PRAYER_ITEMS.map(({ key, label }) => ({ label: `صلاة ${label}`, value: share((d) => (d.prayers[key] === 'mosque' ? 1 : d.prayers[key] === 'home' ? 0.6 : 0)) })),
+    { label: 'أذكار الصباح', value: share((d) => +d.morningAdhkar) },
+    { label: 'أذكار المساء', value: share((d) => +d.eveningAdhkar) },
+    { label: 'أذكار النوم', value: share((d) => +d.sleepAdhkar) },
+    { label: 'صلاة الضحى', value: share((d) => +(d.duhaRakahs > 0)) },
+    { label: 'قيام الليل', value: share((d) => +d.qiyam) },
+    { label: 'الوتر', value: share((d) => +(d.witrRakahs > 0)) },
+    { label: 'السنن الرواتب', value: share((d) => clamp(d.rawatibRakahs, 0, 12) / 12) },
+    { label: 'رضا الوالدين', value: share((d) => clamp(d.parentsSatisfaction, 0, 100) / 100) },
+    { label: 'ورد القراءة', value: share((d) => +((wirdPages(d) ?? 0) > 0)) },
+  ];
+  const weeks = [...new Set(days.map((d) => weekStartOf(d.date)))];
+  items.push({ label: 'الصدقة', value: round1((weeks.filter((w) => days.some((d) => weekStartOf(d.date) === w && d.charity)).length / weeks.length) * 100) });
+  const fridays = days.filter((d) => isFriday(d.date));
+  if (fridays.length) items.push({ label: 'سورة الكهف', value: round1((fridays.filter((d) => d.kahf).length / fridays.length) * 100) });
+  return items;
+}
