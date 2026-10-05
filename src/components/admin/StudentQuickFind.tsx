@@ -32,7 +32,7 @@ export default function StudentQuickFind() {
   };
 
   return (
-    <div className="relative w-full max-w-xs flex-1">
+    <div className="relative order-last w-full flex-none sm:order-none sm:max-w-xs sm:flex-1">
       <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-navy-300" />
       <input
         ref={input}
