@@ -1,25 +1,15 @@
 import { useMemo, useState } from 'react';
-import { Download, FileText, Loader2 } from 'lucide-react';
+import { CalendarRange, Download, FileText, History, Loader2 } from 'lucide-react';
 import { useData } from '@/context/DataContext';
 import { useToast } from '@/context/ToastContext';
 import type { Student } from '@/types';
 import { downloadReport } from '@/utils/report';
 import { TODAY } from '@/utils/today';
-import { cx } from '@/utils/format';
+import { cx, formatDate } from '@/utils/format';
 
-const shiftDays = (iso: string, days: number) => {
-  const d = new Date(`${iso}T12:00:00`);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
-};
+type Mode = 'period' | 'cumulative';
 
-/** آخر يوم بالشهر السابق، وأول يومه */
-const lastMonthRange = () => {
-  const end = shiftDays(`${TODAY.slice(0, 7)}-01`, -1);
-  return { from: `${end.slice(0, 7)}-01`, to: end };
-};
-
-/** تحميل تقرير الطالب PDF عن فترة يحددها المشرف أو ولي الأمر (مع اختصارات جاهزة لأشهر الفترات) */
+/** تحميل تقرير الطالب PDF: عن فترة يحددها المشرف أو ولي الأمر، أو تقرير تراكمي من أول يوم مسجّل حتى اليوم */
 export default function ReportsPanel({ student, className }: { student: Student; className?: string }) {
   const { sessions, dailyWorship, tajweedMaterials } = useData();
   const toast = useToast();
@@ -27,17 +17,12 @@ export default function ReportsPanel({ student, className }: { student: Student;
   const worship = useMemo(() => dailyWorship.filter((d) => d.studentId === student.id), [dailyWorship, student.id]);
   const earliest = useMemo(() => [...mine.map((s) => s.date), ...worship.map((d) => d.date)].sort()[0] ?? TODAY, [mine, worship]);
 
-  const presets = [
-    { label: 'آخر أسبوع', from: shiftDays(TODAY, -6), to: TODAY },
-    { label: 'هذا الشهر', from: `${TODAY.slice(0, 7)}-01`, to: TODAY },
-    { label: 'آخر 30 يومًا', from: shiftDays(TODAY, -29), to: TODAY },
-    { label: 'الشهر الماضي', ...lastMonthRange() },
-    { label: 'من البداية', from: earliest, to: TODAY },
-  ];
-
-  const [from, setFrom] = useState(presets[1].from);
-  const [to, setTo] = useState(TODAY);
+  const [mode, setMode] = useState<Mode>('period');
+  const [periodFrom, setPeriodFrom] = useState(`${TODAY.slice(0, 7)}-01`);
+  const [periodTo, setPeriodTo] = useState(TODAY);
   const [busy, setBusy] = useState(false);
+
+  const { from, to } = mode === 'cumulative' ? { from: earliest, to: TODAY } : { from: periodFrom, to: periodTo };
   const invalid = !from || !to || from > to;
 
   const run = async () => {
@@ -54,6 +39,11 @@ export default function ReportsPanel({ student, className }: { student: Student;
     }
   };
 
+  const options: { key: Mode; icon: typeof FileText; title: string; desc: string }[] = [
+    { key: 'period', icon: CalendarRange, title: 'تحديد فترة', desc: 'اختر تاريخ البداية والنهاية' },
+    { key: 'cumulative', icon: History, title: 'تقرير تراكمي', desc: `من ${formatDate(earliest)} حتى اليوم` },
+  ];
+
   return (
     <section className={cx('card p-5', className)}>
       <div className="mb-4 flex items-center gap-2.5">
@@ -66,37 +56,39 @@ export default function ReportsPanel({ student, className }: { student: Student;
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-1.5">
-        {presets.map((p) => (
+      <div className="grid grid-cols-2 gap-2" role="radiogroup">
+        {options.map(({ key, icon: Icon, title, desc }) => (
           <button
-            key={p.label}
-            onClick={() => {
-              setFrom(p.from);
-              setTo(p.to);
-            }}
-            className={cx(
-              'rounded-full border px-3 py-1.5 text-[12px] font-bold transition',
-              from === p.from && to === p.to ? 'border-navy-800 bg-navy-800 text-white' : 'border-navy-100 bg-white text-navy-600 hover:bg-navy-50',
-            )}
+            key={key}
+            role="radio"
+            aria-checked={mode === key}
+            onClick={() => setMode(key)}
+            className={cx('flex items-center gap-3 rounded-xl border p-3 text-right transition', mode === key ? 'border-navy-800 bg-navy-50/70 ring-1 ring-navy-800' : 'border-navy-100 bg-white hover:bg-navy-50/50')}
           >
-            {p.label}
+            <Icon className="h-5 w-5 shrink-0 text-burgundy-600" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-[14px] font-bold text-navy-800">{title}</span>
+              <span className="block text-[12px] text-navy-400">{desc}</span>
+            </span>
           </button>
         ))}
       </div>
 
-      <div className="mt-3">
-        <div className="grid grid-cols-2 gap-2">
-          <label className="text-[12px] text-navy-500">
-            من تاريخ
-            <input type="date" className="input mt-1" value={from} max={to || TODAY} onChange={(e) => setFrom(e.target.value)} />
-          </label>
-          <label className="text-[12px] text-navy-500">
-            إلى تاريخ
-            <input type="date" className="input mt-1" value={to} min={from} max={TODAY} onChange={(e) => setTo(e.target.value)} />
-          </label>
+      {mode === 'period' && (
+        <div className="mt-3">
+          <div className="grid grid-cols-2 gap-2">
+            <label className="text-[12px] text-navy-500">
+              من تاريخ
+              <input type="date" className="input mt-1" value={periodFrom} max={periodTo || TODAY} onChange={(e) => setPeriodFrom(e.target.value)} />
+            </label>
+            <label className="text-[12px] text-navy-500">
+              إلى تاريخ
+              <input type="date" className="input mt-1" value={periodTo} min={periodFrom} max={TODAY} onChange={(e) => setPeriodTo(e.target.value)} />
+            </label>
+          </div>
+          {invalid && <p className="mt-2 text-[12px] text-burgundy-600">يجب أن يكون تاريخ البداية قبل تاريخ النهاية.</p>}
         </div>
-        {invalid && <p className="mt-2 text-[12px] text-burgundy-600">يجب أن يكون تاريخ البداية قبل تاريخ النهاية.</p>}
-      </div>
+      )}
 
       <button onClick={run} disabled={busy || invalid} className="btn-primary mt-3 w-full py-3">
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
