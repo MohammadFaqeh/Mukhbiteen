@@ -1,11 +1,11 @@
 /**
- * شهادة إتمام حفظ جزء — PDF أفقي (A4) يُبنى داخل المتصفح بنفس طريقة التقرير:
- * صفحة HTML (حتى يظهر الخط العربي صحيحًا) تتحوّل لصورة عالية الدقة داخل ملف PDF.
- * التصميم الحالي مؤقت — لما يصل تصميم المشرف يُستبدل buildPage فقط (مثلًا صورة خلفية + اسم الطالب والجزء والتاريخ فوقها).
+ * شهادة إتمام حفظ جزء — PDF أفقي (A4) يُرسم داخل المتصفح.
+ * الخلفية تصميم المركز (public/certificates/juz-template.png)، ونكتب فوقها بأماكنها الفاضية:
+ * اسم الطالب، ورقم الجزء (بالأرقام الإنجليزية)، والتاريخ — مع شعار المشروع أعلى الشهادة.
+ * الرسم مباشرة على canvas (وليس لقطة لصفحة HTML) حتى تكون المواضع دقيقة وثابتة في كل مرة.
+ * المواضع نسب من أبعاد التصميم (3508×2480) مقاسة من الملف نفسه، فلو تغيّر التصميم تُعدَّل قيم POS فقط.
  */
 import type { Student } from '@/types';
-import { PROJECT, supervisor } from '@/data/project';
-import { formatDate } from './format';
 import { savePdf } from './savePdf';
 
 /** "الجزء الثلاثين" — صفة العدد الترتيبي بعد "حفظ الجزء" (مجرورة) */
@@ -14,80 +14,98 @@ const ORDINALS = [
   'الحادي عشر', 'الثاني عشر', 'الثالث عشر', 'الرابع عشر', 'الخامس عشر', 'السادس عشر', 'السابع عشر', 'الثامن عشر', 'التاسع عشر', 'العشرين',
   'الحادي والعشرين', 'الثاني والعشرين', 'الثالث والعشرين', 'الرابع والعشرين', 'الخامس والعشرين', 'السادس والعشرين', 'السابع والعشرين', 'الثامن والعشرين', 'التاسع والعشرين', 'الثلاثين',
 ];
-/** الأسماء المشهورة لبعض الأجزاء */
-const JUZ_NAMES: Record<number, string> = { 1: 'جزء الم', 28: 'جزء قد سمع', 29: 'جزء تبارك', 30: 'جزء عمّ' };
 
 export const juzTitle = (n: number) => `الجزء ${ORDINALS[n - 1] ?? n}`;
 
-const W = 1123; // A4 أفقي بدقة 96dpi
-const H = 794;
-const C = { navy: '#1E2B45', ink: '#24324D', muted: '#6B7A96', gold: '#B8975A', goldSoft: '#E9DCC0', sand: '#FBF8F3' };
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+const GREEN = '#0F4D3A';
+const GOLD = '#A8832F';
+const PAPER = '#FFFEFA';
+/** عرض الصورة النهائية بالبكسل (ارتفاعها بنفس نسبة التصميم) — دقة طباعة جيدة بحجم ملف معقول */
+const OUT_W = 2480;
 
-function buildPage(student: Student, juz: number, date?: string) {
-  const base = import.meta.env.BASE_URL;
-  const name = JUZ_NAMES[juz];
-  const page = document.createElement('div');
-  page.style.cssText = `width:${W}px;height:${H}px;box-sizing:border-box;padding:26px;background:${C.sand};direction:rtl;font-family:Tajawal,system-ui,sans-serif;color:${C.ink}`;
-  page.innerHTML = `
-    <div style="height:100%;box-sizing:border-box;border:2px solid ${C.gold};border-radius:18px;padding:8px">
-      <div style="height:100%;box-sizing:border-box;border:1px solid ${C.goldSoft};border-radius:12px;background:#fff;display:flex;flex-direction:column;align-items:center;padding:30px 70px 26px;text-align:center">
-        <div style="width:100%;display:flex;justify-content:space-between;align-items:center">
-          <img src="${base}images/brand/mukhbiteen-logo.png" crossorigin="anonymous" style="height:92px"/>
-          <div style="font-family:Amiri,serif;font-size:26px;color:${C.gold}">بسم الله الرحمن الرحيم</div>
-          <img src="${base}images/brand/center-logo.png" crossorigin="anonymous" style="height:88px"/>
-        </div>
-        <div style="margin-top:14px;font-size:46px;font-weight:800;color:${C.navy}">شهادة إتمام حفظ</div>
-        <div style="width:120px;height:3px;border-radius:3px;background:${C.gold};margin:20px 0 22px"></div>
-        <div style="font-size:21px;line-height:1.9;color:${C.ink}">يشهد ${esc(PROJECT.name)} في ${esc(PROJECT.center)} بأن الطالب</div>
-        <div style="margin:8px 0 6px;font-size:44px;font-weight:800;color:${C.navy}">${esc(student.name)}</div>
-        <div style="font-size:21px;line-height:1.9;color:${C.ink}">قد أتمّ حفظ <b style="color:${C.navy}">${juzTitle(juz)}</b>${name ? ` (${name})` : ''} من القرآن الكريم، وسرده كاملًا عن ظهر قلب</div>
-        ${date ? `<div style="margin-top:4px;font-size:17px;color:${C.muted}">بتاريخ ${formatDate(date)}</div>` : ''}
-        <div style="margin-top:16px;font-family:Amiri,serif;font-size:21px;color:${C.gold}">نسأل الله أن يجعله من أهل القرآن الذين هم أهل الله وخاصته</div>
-        <div style="margin-top:auto;width:100%;display:flex;justify-content:space-between;align-items:flex-end">
-          <div style="text-align:center;min-width:240px">
-            <div style="font-size:14px;color:${C.muted}">${esc(supervisor.title)}</div>
-            <div style="margin-top:4px;font-size:19px;font-weight:800;color:${C.navy}">${esc(supervisor.name)}</div>
-          </div>
-          <div style="font-family:Amiri,serif;font-size:28px;color:${C.navy}">﴿ ${esc(PROJECT.verse)} ﴾</div>
-          <div style="min-width:240px"></div>
-        </div>
-      </div>
-    </div>`;
-  return page;
+/** المواضع كنسب من العرض/الارتفاع. line = ارتفاع الخط المنقّط؛ النص يُرسم فوقه بمسافة gap */
+const POS = {
+  name: { x: 0.5, line: 0.5617, size: 0.0375, maxW: 0.42 }, // size نسبة من العرض
+  juz: { x: 0.33, line: 0.6431, size: 0.027 },
+  date: { x: 0.5, line: 0.8681, size: 0.0155 },
+  gap: 0.006,
+  logo: { x: 0.835, y: 0.165, w: 0.15 }, // شعار المشروع أعلى يمين الشهادة
+  hint: { x: 0.478, y: 0.564, w: 0.044, h: 0.02 }, // كلمة "اسم الطالب" المطبوعة تحت الخط — تُغطّى بلون الخلفية
+};
+
+/** 2026-10-05 ← 2026/10/05 */
+const slashDate = (iso: string) => iso.replace(/-/g, '/');
+
+const loadImage = (src: string) =>
+  new Promise<HTMLImageElement | null>((res) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => res(img);
+    img.onerror = () => res(null);
+    img.src = src;
+  });
+
+/** يرسم نصًا متمركزًا أفقيًا حول x، وأسفله (مع الحروف النازلة) فوق الخط بمسافة ثابتة */
+function textAbove(g: CanvasRenderingContext2D, text: string, x: number, lineY: number, gap: number, font: string, color: string, maxW?: number) {
+  g.font = font;
+  g.fillStyle = color;
+  g.textAlign = 'center';
+  g.textBaseline = 'alphabetic';
+  const m = g.measureText(text);
+  if (maxW && m.width > maxW) {
+    // اسم طويل جدًا: نصغّر الخط حتى يتسع ضمن الخط المنقّط
+    const size = parseFloat(font.match(/(\d+(?:\.\d+)?)px/)![1]);
+    g.font = font.replace(/\d+(?:\.\d+)?px/, `${Math.floor((size * maxW) / m.width)}px`);
+  }
+  const descent = g.measureText(text).actualBoundingBoxDescent || 0;
+  g.fillText(text, x, lineY - gap - descent);
 }
 
-const waitImages = (root: HTMLElement) =>
-  Promise.all(
-    [...root.querySelectorAll('img')].map(
-      (img) =>
-        new Promise<void>((res) => {
-          if (img.complete && img.naturalWidth) return res();
-          img.onload = () => res();
-          img.onerror = () => {
-            img.remove();
-            res();
-          };
-        }),
-    ),
+/** يبني صورة الشهادة (canvas) */
+async function drawCertificate(student: Student, juz: number) {
+  const base = import.meta.env.BASE_URL;
+  const [tpl, logo] = await Promise.all([loadImage(`${base}certificates/juz-template.png`), loadImage(`${base}images/brand/mukhbiteen-logo.png`)]);
+  // الخط العربي محمّل كأجزاء حسب الحروف (unicode-range): لازم نطلبه مع النص نفسه وإلا يُرسم الاسم بخط بديل
+  await Promise.all(
+    [['700 80px Amiri', `${student.name} 0123456789`], ['500 40px Tajawal', '0123456789/']].map(([f, t]) => document.fonts?.load(f, t).catch(() => undefined)),
   );
+  await document.fonts?.ready;
+
+  const W = OUT_W;
+  const H = Math.round(tpl ? (W * tpl.height) / tpl.width : W / Math.SQRT2);
+  const cv = document.createElement('canvas');
+  cv.width = W;
+  cv.height = H;
+  const g = cv.getContext('2d')!;
+  g.fillStyle = PAPER;
+  g.fillRect(0, 0, W, H);
+  if (tpl) g.drawImage(tpl, 0, 0, W, H);
+  g.direction = 'rtl';
+
+  const { hint } = POS;
+  g.fillStyle = PAPER;
+  g.fillRect(hint.x * W, hint.y * H, hint.w * W, hint.h * H);
+
+  if (logo) {
+    const lw = POS.logo.w * W;
+    const lh = (lw * logo.height) / logo.width;
+    g.drawImage(logo, POS.logo.x * W - lw / 2, POS.logo.y * H - lh / 2, lw, lh);
+  }
+
+  const gap = POS.gap * H;
+  textAbove(g, student.name, POS.name.x * W, POS.name.line * H, gap, `700 ${POS.name.size * W}px Amiri, serif`, GREEN, POS.name.maxW * W);
+  g.direction = 'ltr';
+  textAbove(g, String(juz), POS.juz.x * W, POS.juz.line * H, gap, `700 ${POS.juz.size * W}px Amiri, serif`, GOLD);
+  const date = student.memorizedJuzDates?.[String(juz)];
+  if (date) textAbove(g, slashDate(date), POS.date.x * W, POS.date.line * H, gap, `500 ${POS.date.size * W}px Tajawal, system-ui, sans-serif`, '#1F2A37');
+  return cv;
+}
 
 /** يبني شهادة الجزء ويحمّلها PDF */
 export async function downloadJuzCertificate(student: Student, juz: number) {
-  const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas'), import('jspdf')]);
-  await document.fonts?.ready;
-  const holder = document.createElement('div');
-  holder.style.cssText = 'position:fixed;top:0;left:-10000px;z-index:-1;pointer-events:none';
-  document.body.appendChild(holder);
-  try {
-    const page = buildPage(student, juz, student.memorizedJuzDates?.[String(juz)]);
-    holder.appendChild(page);
-    await waitImages(page);
-    const canvas = await html2canvas(page, { scale: 2, useCORS: true, backgroundColor: '#ffffff', width: W, height: H, windowWidth: W });
-    const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4', compress: true });
-    pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight());
-    await savePdf(pdf, `شهادة-${juzTitle(juz).replace(/\s+/g, '-')}-${student.name.replace(/\s+/g, '-')}.pdf`);
-  } finally {
-    holder.remove();
-  }
+  const { jsPDF } = await import('jspdf');
+  const cv = await drawCertificate(student, juz);
+  const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4', compress: true });
+  pdf.addImage(cv.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight());
+  await savePdf(pdf, `شهادة-${juzTitle(juz).replace(/\s+/g, '-')}-${student.name.replace(/\s+/g, '-')}.pdf`);
 }
