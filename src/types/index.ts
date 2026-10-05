@@ -72,6 +72,7 @@ export interface Student {
   tajweedCompleted?: TajweedCourse[]; // دورات التجويد التي اجتازها
   tajweedCurrent?: TajweedCourse; // الدورة المسجّل فيها حاليًا
   memorizedJuz?: number[]; // أرقام الأجزاء المحفوظة كاملة (1-30) — يحددها المشرف يدويًا
+  memorizedJuzDates?: Record<string, string>; // تاريخ إتمام كل جزء (رقم الجزء ← YYYY-MM-DD) — يُكتب على شهادة الجزء
 }
 
 /**

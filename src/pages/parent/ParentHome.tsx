@@ -6,6 +6,7 @@ import HonorBoardCard from '@/components/parent/HonorBoardCard';
 import Slideshow from '@/components/parent/Slideshow';
 import NextSessionTicket from '@/components/parent/NextSessionTicket';
 import StatsRow from '@/components/parent/StatsRow';
+import MonthBadges from '@/components/parent/MonthBadges';
 import TrendCard from '@/components/parent/TrendCard';
 import WorshipCard from '@/components/parent/WorshipCard';
 import { CommitmentCard, MemorizationCard, RevisionCard } from '@/components/parent/QuranCards';
@@ -36,6 +37,8 @@ export default function ParentHome() {
       <Slideshow items={live.length ? live : activities.slice(0, 3)} className="min-h-[300px] sm:min-h-[420px] lg:min-h-[520px]" />
 
       <StatsRow stats={stats} month={month} />
+
+      <MonthBadges sessions={sessions} worship={worship} />
 
       <div className="grid gap-4 sm:gap-5 md:grid-cols-2 xl:grid-cols-12">
         <div className="md:col-span-2 xl:col-span-7">

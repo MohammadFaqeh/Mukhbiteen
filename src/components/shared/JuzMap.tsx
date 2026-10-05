@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { BookMarked, Crown, Loader2 } from 'lucide-react';
+import { Award, BookMarked, Crown, Loader2 } from 'lucide-react';
 import { useData } from '@/context/DataContext';
 import { useToast } from '@/context/ToastContext';
 import type { Student } from '@/types';
 import { cx } from '@/utils/format';
+import { TODAY } from '@/utils/today';
+import { downloadJuzCertificate, juzTitle } from '@/utils/certificate';
 
 const JUZ_COUNT = 30;
 
@@ -92,25 +94,43 @@ export function JuzProgressBanner({ student }: { student: Student }) {
 
 /**
  * حفظ القرآن الكريم بالتفصيل: خط تقدّم (من 30 جزءًا) والأجزاء الثلاثون كمربعات صغيرة.
- * editable (للمشرف): الضغط على الجزء يحدده محفوظًا أو يلغيه، ويُحفظ مباشرة.
+ * editable (للمشرف): الضغط على الجزء يحدده محفوظًا أو يلغيه، ويُحفظ مباشرة مع تاريخ الإتمام (للشهادة).
+ * لولي الأمر: الضغط على جزء محفوظ يحمّل شهادة إتمامه.
  */
 export default function JuzMap({ student, editable }: { student: Student; editable?: boolean }) {
   const { updateStudent } = useData();
   const toast = useToast();
   const [busy, setBusy] = useState(false);
+  const [certBusy, setCertBusy] = useState<number | null>(null);
   const juz = student.memorizedJuz ?? [];
   const done = new Set(juz);
   const { percent, hafiz } = juzProgress(student);
 
   const toggle = async (n: number) => {
-    const next = done.has(n) ? juz.filter((x) => x !== n) : [...juz, n].sort((a, b) => a - b);
+    const removing = done.has(n);
+    const next = removing ? juz.filter((x) => x !== n) : [...juz, n].sort((a, b) => a - b);
+    // تاريخ الإتمام يُسجَّل تلقائيًا يوم التحديد، ويُمسح عند الإلغاء
+    const { [String(n)]: _old, ...otherDates } = student.memorizedJuzDates ?? {};
+    const dates = removing ? otherDates : { ...otherDates, [String(n)]: TODAY };
     setBusy(true);
     try {
-      await updateStudent(student.id, { memorizedJuz: next });
+      await updateStudent(student.id, { memorizedJuz: next, memorizedJuzDates: dates });
     } catch (e) {
       toast(e instanceof Error ? e.message : 'تعذّر الحفظ.');
     } finally {
       setBusy(false);
+    }
+  };
+
+  const certificate = async (n: number) => {
+    setCertBusy(n);
+    try {
+      await downloadJuzCertificate(student, n);
+    } catch (e) {
+      console.error(e);
+      toast('تعذّر تجهيز الشهادة، حاول مرة أخرى.');
+    } finally {
+      setCertBusy(null);
     }
   };
 
@@ -123,7 +143,7 @@ export default function JuzMap({ student, editable }: { student: Student; editab
           </span>
           <div>
             <h3 className="section-title">حفظ القرآن الكريم</h3>
-            <p className="text-[12px] text-navy-400">{editable ? 'اضغط على الجزء لتحديده محفوظًا أو إلغاء تحديده' : 'الأجزاء التي أتمّ الطالب حفظها'}</p>
+            <p className="text-[12px] text-navy-400">{editable ? 'اضغط على الجزء لتحديده محفوظًا أو إلغاء تحديده' : done.size ? 'اضغط على أي جزء محفوظ لتحميل شهادة إتمامه' : 'الأجزاء التي أتمّ الطالب حفظها'}</p>
           </div>
         </div>
         <div className="flex items-center gap-2 text-[13px] text-navy-500">
@@ -155,8 +175,21 @@ export default function JuzMap({ student, editable }: { student: Student; editab
             <button key={n} type="button" disabled={busy} onClick={() => toggle(n)} className={cls} aria-pressed={on} aria-label={`الجزء ${n}`}>
               {n}
             </button>
+          ) : on ? (
+            <button
+              key={n}
+              type="button"
+              disabled={certBusy !== null}
+              onClick={() => certificate(n)}
+              className={cx(cls, 'group relative hover:opacity-85')}
+              aria-label={`تحميل شهادة ${juzTitle(n)}`}
+              title={`تحميل شهادة ${juzTitle(n)}`}
+            >
+              {certBusy === n ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : n}
+              <Award className="absolute left-0.5 top-0.5 h-2.5 w-2.5 opacity-60" />
+            </button>
           ) : (
-            <span key={n} className={cls} aria-label={`الجزء ${n}${on ? ' (محفوظ)' : ''}`}>
+            <span key={n} className={cls} aria-label={`الجزء ${n}`}>
               {n}
             </span>
           );

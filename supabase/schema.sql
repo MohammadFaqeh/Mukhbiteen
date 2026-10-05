@@ -107,6 +107,8 @@ alter table public.students add column if not exists tajweed_completed text[] no
 alter table public.students add column if not exists tajweed_current text;
 -- الأجزاء المحفوظة كاملة (1-30) — يحددها المشرف من ملف الطالب
 alter table public.students add column if not exists memorized_juz smallint[] not null default '{}';
+-- تاريخ إتمام كل جزء { "30": "2026-10-05" } — يُكتب على شهادة الجزء
+alter table public.students add column if not exists memorized_juz_dates jsonb not null default '{}'::jsonb;
 
 -- سورة الكهف يوم الجمعة
 alter table public.daily_worship add column if not exists kahf boolean not null default false;

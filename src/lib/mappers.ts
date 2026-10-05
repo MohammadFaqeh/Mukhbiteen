@@ -21,6 +21,7 @@ export function studentFromRow(r: any): Student {
     tajweedCompleted: Array.isArray(r.tajweed_completed) ? r.tajweed_completed : [],
     tajweedCurrent: r.tajweed_current ?? undefined,
     memorizedJuz: Array.isArray(r.memorized_juz) ? r.memorized_juz.map(Number) : [],
+    memorizedJuzDates: r.memorized_juz_dates && typeof r.memorized_juz_dates === 'object' ? r.memorized_juz_dates : {},
   };
 }
 
@@ -40,6 +41,7 @@ export function studentToRow(s: Partial<Student>) {
   if (s.tajweedCompleted !== undefined) row.tajweed_completed = s.tajweedCompleted;
   if (s.tajweedCurrent !== undefined) row.tajweed_current = s.tajweedCurrent || null;
   if (s.memorizedJuz !== undefined) row.memorized_juz = s.memorizedJuz;
+  if (s.memorizedJuzDates !== undefined) row.memorized_juz_dates = s.memorizedJuzDates;
   return row;
 }
 
