@@ -165,11 +165,15 @@ export default function WorshipDayForm({ studentId, worship }: { studentId: stri
               disabled={x > TODAY}
               onClick={() => setDate(x)}
               className={cx(
-                'flex min-w-0 flex-col items-center gap-0.5 rounded-xl border px-0.5 py-2 text-[11px] transition disabled:opacity-30 sm:text-[12px]',
+                'flex min-w-0 flex-col items-center gap-0.5 rounded-xl border px-0 py-2 text-[10.5px] transition disabled:opacity-30 sm:text-[12px]',
                 x === date ? 'border-navy-800 bg-navy-800 text-white' : done ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-navy-100 bg-white text-navy-600',
               )}
             >
-              <span className="w-full truncate text-center font-bold">{WEEKDAY_LABELS[i]}</span>
+              <span className="w-full truncate text-center font-bold">
+                {/* على الهاتف اسم اليوم بدون "ال" حتى يتسع بالكامل */}
+                <span className="sm:hidden">{WEEKDAY_LABELS[i].replace(/^ال/, '')}</span>
+                <span className="hidden sm:inline">{WEEKDAY_LABELS[i]}</span>
+              </span>
               <span className="text-[11px] opacity-80">{Number(x.slice(8))}</span>
               <span className="h-4 text-[11px]">{done ? '✓' : x === TODAY ? 'اليوم' : ''}</span>
             </button>

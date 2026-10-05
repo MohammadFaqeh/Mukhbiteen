@@ -69,7 +69,7 @@ export default function ParentLayout() {
           ) : (
             <>
               {/* ثابت أعلى كل صفحات ولي الأمر: كم حفظ ابنه من 30 جزءًا */}
-              {student && <JuzProgressBanner student={student} />}
+              {student && pathname !== '/parent/quran' && <JuzProgressBanner student={student} />}
               <ErrorBoundary key={pathname}>
                 <Outlet />
               </ErrorBoundary>

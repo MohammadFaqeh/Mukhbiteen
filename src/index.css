@@ -11,6 +11,9 @@
   ::selection { background: #E6D8C3; color: #1E2B45; }
   :focus-visible { outline: 2px solid #7A2336; outline-offset: 2px; border-radius: 6px; }
   input, select, textarea { font: inherit; }
+  /* عناصر الشبكة تنكمش لعرض الشاشة: بدونها جدول عريض (داخل مربع تمرير أفقي) يوسّع عمود الصفحة كلها
+     فيصير الموقع على الهاتف أعرض من الشاشة ويتصغّر */
+  .grid > * { min-width: 0; }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
   }

@@ -52,7 +52,8 @@ export default function ParentHome() {
         </div>
       </div>
 
-      <div className="grid gap-4 sm:gap-5 md:grid-cols-3">
+      {/* على الهاتف: هذه البطاقات موجودة بصفحة "الحفظ والمراجعة"، فنخفيها هنا لتبقى الرئيسية بسيطة */}
+      <div className="hidden gap-4 sm:gap-5 md:grid md:grid-cols-3">
         <MemorizationCard last={sessions.find((s) => s.memorization)} />
         <RevisionCard sessions={sessions} />
         <CommitmentCard stats={stats} />
@@ -61,7 +62,7 @@ export default function ParentHome() {
       <SessionTimeline sessions={sessions} studentName={student.name} />
 
       <div className="grid gap-4 sm:gap-5 lg:grid-cols-12">
-        <ReportsPanel student={student} className="lg:col-span-8" />
+        <ReportsPanel student={student} className="hidden md:block lg:col-span-8" />
         <div className="lg:col-span-4">
           <SupervisorCard />
         </div>

@@ -37,27 +37,27 @@ export default function StudentHero({ student, stats }: { student: Student; stat
         </g>
       </svg>
 
-      <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center">
-        <ArchPortrait src={student.photo} name={student.name} className="mx-auto h-44 w-36 sm:mx-0" />
-        <div className="flex-1 text-center sm:text-right">
-          <p className="flex items-center justify-center gap-2 text-[13px] font-medium text-burgundy-600 sm:justify-start">
+      <div className="relative flex flex-row items-center gap-4 sm:gap-6">
+        <ArchPortrait src={student.photo} name={student.name} className="h-28 w-[88px] sm:h-44 sm:w-36" />
+        <div className="min-w-0 flex-1 text-right">
+          <p className="hidden items-center gap-2 text-[13px] font-medium text-burgundy-600 sm:flex">
             <StarMark className="h-3 w-3" />
             {PROJECT.name}
           </p>
-          <h1 className="mt-2 text-[26px] font-extrabold leading-snug text-navy-900 sm:text-[32px]">
-            أهلًا بكم في صفحة الطالب
-            <span className="block text-navy-700">{student.name}</span>
+          <h1 className="font-extrabold leading-snug text-navy-900 sm:mt-2 sm:text-[32px]">
+            <span className="block text-[13px] font-medium text-navy-500 sm:text-[32px] sm:font-extrabold sm:text-navy-900">أهلًا بكم في صفحة الطالب</span>
+            <span className="block text-[21px] text-navy-800 sm:text-[32px] sm:text-navy-700">{student.name}</span>
           </h1>
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[13px] text-navy-500 sm:justify-start">
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12px] text-navy-500 sm:mt-4 sm:gap-x-5 sm:gap-y-2 sm:text-[13px]">
             <span className="flex items-center gap-1.5">
               <Users2 className="h-4 w-4 text-navy-300" />
               {student.group}
             </span>
-            <span className="flex items-center gap-1.5">
+            <span className="hidden items-center gap-1.5 sm:flex">
               <Clock3 className="h-4 w-4 text-navy-300" />
               آخر تحديث: {updated ? formatDate(updated) : '—'}
             </span>
-            <span className="flex items-center gap-1.5">
+            <span className="hidden items-center gap-1.5 sm:flex">
               <CalendarDays className="h-4 w-4 text-navy-300" />
               {stats.sessionsCount} يوم دوام مسجل
             </span>
