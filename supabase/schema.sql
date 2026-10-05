@@ -105,6 +105,8 @@ create table if not exists public.honor_boards (
 -- دورات التجويد لكل طالب: المجتازة + الحالية
 alter table public.students add column if not exists tajweed_completed text[] not null default '{}';
 alter table public.students add column if not exists tajweed_current text;
+-- الأجزاء المحفوظة كاملة (1-30) — يحددها المشرف من ملف الطالب
+alter table public.students add column if not exists memorized_juz smallint[] not null default '{}';
 
 -- سورة الكهف يوم الجمعة
 alter table public.daily_worship add column if not exists kahf boolean not null default false;

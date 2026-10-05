@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useParentStudent } from '@/hooks/useParentStudent';
 import PageHeader from '@/components/shared/PageHeader';
+import JuzMap from '@/components/shared/JuzMap';
 import { MemorizationCard, RevisionCard } from '@/components/parent/QuranCards';
 import { ProgressBar } from '@/components/ui/Progress';
 import StatCard from '@/components/ui/StatCard';
@@ -8,13 +9,16 @@ import { BookOpen, RotateCcw, Target } from 'lucide-react';
 import { cx, formatDate, pct } from '@/utils/format';
 
 export default function ParentQuran() {
-  const { sessions, stats } = useParentStudent();
+  const { student, sessions, stats } = useParentStudent();
   const [tab, setTab] = useState<'mem' | 'rev'>('mem');
   const rows = sessions.filter((s) => (tab === 'mem' ? s.memorization : s.revision)).slice(0, 12);
-  if (!stats) return null;
+  if (!stats || !student) return null;
   return (
     <div>
       <PageHeader title="الحفظ والمراجعة" subtitle="سجل التسميع والمراجعة في أيام الدوام الأخيرة" />
+      <div className="mb-4">
+        <JuzMap student={student} />
+      </div>
       <div className="grid gap-4 lg:grid-cols-12">
         <div className="grid gap-4 sm:grid-cols-2 lg:col-span-5 lg:grid-cols-1">
           <MemorizationCard last={sessions.find((s) => s.memorization)} />

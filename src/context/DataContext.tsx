@@ -147,7 +147,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const updateStudent = useCallback(async (id: string, patch: Partial<Student>) => {
     const { error: err } = await supabase.from('students').update(studentToRow(patch)).eq('id', id);
-    if (err) throw schemaError(err.message, /tajweed_/);
+    if (err) throw schemaError(err.message, /tajweed_|memorized_juz/);
     setData((d) => ({ ...d, students: d.students.map((s) => (s.id === id ? { ...s, ...patch } : s)) }));
   }, []);
 

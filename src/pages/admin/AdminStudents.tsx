@@ -15,6 +15,7 @@ import { useToast } from '@/context/ToastContext';
 import { downloadStudentsFile } from '@/utils/studentsExcel';
 import type { CommitmentLevel, Student } from '@/types';
 import { studentStats } from '@/utils/stats';
+import { juzCountLabel } from '@/components/shared/JuzMap';
 import { cx, pct } from '@/utils/format';
 
 type Sort = 'avg' | 'name' | 'attendance';
@@ -120,6 +121,7 @@ export default function AdminStudents() {
                   <tr>
                     <th className="px-5 py-3 font-medium">الطالب</th>
                     <th className="px-3 py-3 font-medium">ولي الأمر</th>
+                    <th className="px-3 py-3 font-medium">المحفوظ</th>
                     <th className="w-44 px-3 py-3 font-medium">المعدل</th>
                     <th className="px-3 py-3 font-medium">معدل الشهر</th>
                     <th className="px-3 py-3 font-medium">الحضور</th>
@@ -143,6 +145,7 @@ export default function AdminStudents() {
                         </div>
                       </td>
                       <td className="px-3 py-3 text-navy-600">{s.guardianName}</td>
+                      <td className="whitespace-nowrap px-3 py-3 text-navy-700">{s.memorizedJuz?.length ? juzCountLabel(s.memorizedJuz.length) : '—'}</td>
                       <td className="px-3 py-3">
                         <div className="flex items-center gap-2">
                           <ProgressBar value={st.cumulative} thin />

@@ -4,7 +4,7 @@ import { ArrowRight, BookOpen, CalendarCheck, CalendarPlus, HandHeart, Loader2, 
 import { useData } from '@/context/DataContext';
 import { useToast } from '@/context/ToastContext';
 import { useConfirmDelete } from '@/hooks/useConfirmDelete';
-import type { DailyWorship, SessionRecord } from '@/types';
+import type { DailyWorship, SessionRecord, Student } from '@/types';
 import { ArchPortrait } from '@/components/parent/StudentHero';
 import StatCard from '@/components/ui/StatCard';
 import TrendCard from '@/components/parent/TrendCard';
@@ -18,6 +18,7 @@ import StudentFormModal from '@/components/admin/StudentFormModal';
 import WorshipWeekGrid from '@/components/shared/WorshipWeekGrid';
 import SessionDetail from '@/components/shared/SessionDetail';
 import ReportsPanel from '@/components/shared/ReportsPanel';
+import JuzMap from '@/components/shared/JuzMap';
 import SessionTimeline from '@/components/parent/SessionTimeline';
 import { studentSessions, studentStats } from '@/utils/stats';
 import { dailyWorshipScore, emptyDailyWorship, weekDates, weekStartOf, weekWorshipScore } from '@/utils/worship';
@@ -106,7 +107,7 @@ export default function AdminStudentDetail() {
       </nav>
 
       <div key={tab} className="animate-fade-in">
-        {tab === 'overview' && <Overview sessions={sessions} stats={stats} name={student.name} />}
+        {tab === 'overview' && <Overview student={student} sessions={sessions} stats={stats} name={student.name} />}
         {tab === 'sessions' && <SessionsTab studentId={id} sessions={sessions} name={student.name} openDate={params.get('date')} />}
         {tab === 'memorization' && <QuranTab kind="mem" studentId={id} sessions={sessions} />}
         {tab === 'revision' && <QuranTab kind="rev" studentId={id} sessions={sessions} />}
@@ -121,7 +122,7 @@ export default function AdminStudentDetail() {
 }
 
 /* ---------------- نظرة عامة ---------------- */
-function Overview({ sessions, stats, name }: { sessions: SessionRecord[]; stats: ReturnType<typeof studentStats>; name: string }) {
+function Overview({ student, sessions, stats, name }: { student: Student; sessions: SessionRecord[]; stats: ReturnType<typeof studentStats>; name: string }) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
@@ -130,6 +131,7 @@ function Overview({ sessions, stats, name }: { sessions: SessionRecord[]; stats:
         <StatCard icon={BookOpen} label="متوسط التسميع" value={pct(stats.memorization)} progress={stats.memorization} tone="gold" />
         <StatCard icon={HandHeart} label="العبادات" value={pct(stats.worship)} progress={stats.worship} tone="green" />
       </div>
+      <JuzMap student={student} editable />
       <div className="grid gap-4 xl:grid-cols-2">
         <TrendCard stats={stats} />
         <section className="card p-5">
