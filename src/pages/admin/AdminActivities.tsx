@@ -80,7 +80,7 @@ export default function AdminActivities() {
     <div>
       <PageHeader
         title="الصور والأنشطة"
-        subtitle="الصور التي تظهر في السلايد شو بصفحة ولي الأمر"
+        subtitle="الصور التي تظهر في العرض المتحرك بصفحة ولي الأمر"
         actions={
           <button className="btn-accent" onClick={openNew}>
             <Plus className="h-4 w-4" /> إضافة صورة
@@ -89,7 +89,7 @@ export default function AdminActivities() {
       />
       <div className="grid gap-4 xl:grid-cols-12">
         <div className="xl:col-span-4">
-          <p className="mb-2 text-[12px] text-navy-400">معاينة السلايد شو الحالي ({live.length} صور معروضة)</p>
+          <p className="mb-2 text-[12px] text-navy-400">معاينة العرض الحالي ({live.length} صور معروضة)</p>
           <Slideshow items={live} className="h-[300px]" />
         </div>
         <div className="grid content-start gap-4 sm:grid-cols-2 xl:col-span-8 2xl:grid-cols-3">
@@ -150,7 +150,7 @@ export default function AdminActivities() {
         open={modal.open}
         onClose={() => setModal({ open: false })}
         title={modal.id ? 'تعديل المنشور' : 'إضافة صور'}
-        subtitle="تقدر ترفع أكثر من صورة مرة وحدة، والعنوان اختياري"
+        subtitle="يمكنك رفع أكثر من صورة دفعة واحدة، والعنوان اختياري"
         size="xl"
         footer={
           <>
@@ -186,7 +186,7 @@ export default function AdminActivities() {
                     className="input rounded-none border-0 border-t border-navy-50 text-[13px]"
                     value={im.caption ?? ''}
                     onChange={(e) => setCaption(k, e.target.value)}
-                    placeholder={k === 0 ? 'بدون: يظهر العنوان الرئيسي' : 'عنوان لهذه الصورة (اختياري)'}
+                    placeholder={k === 0 ? 'اتركه فارغًا ليظهر العنوان الرئيسي' : 'عنوان لهذه الصورة (اختياري)'}
                   />
                 </li>
               ))}
@@ -194,7 +194,7 @@ export default function AdminActivities() {
           )}
           <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-navy-200 bg-navy-50/40 py-6 text-[13px] text-navy-500 hover:bg-navy-50 sm:col-span-2">
             {uploading ? <Loader2 className="h-8 w-8 animate-spin text-navy-300" /> : <ImagePlus className="h-8 w-8 text-navy-300" />}
-            {uploading ? 'جارٍ رفع الصور...' : d.images.length ? 'إضافة صور أخرى لنفس المنشور' : 'اختر صورة أو أكثر من جهازك'}
+            {uploading ? 'جارٍ رفع الصور...' : d.images.length ? 'إضافة صور أخرى إلى المنشور نفسه' : 'اختر صورة أو أكثر من جهازك'}
             <input type="file" accept="image/*" multiple className="sr-only" onChange={onFiles} disabled={uploading} />
           </label>
           <Field label="العنوان الرئيسي (اختياري — يظهر على الصورة الرئيسية فقط)" className="sm:col-span-2">

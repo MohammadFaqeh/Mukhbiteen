@@ -18,7 +18,7 @@ const HEADERS: [StudentField, string, number][] = [
   ['birthDate', 'تاريخ الميلاد', 14],
   ['guardianName', 'اسم ولي الأمر', 24],
   ['guardianEmail', 'بريد ولي الأمر (لتسجيل الدخول)', 30],
-  ['id', 'رقم الطالب بالموقع (لا تعدّله)', 18],
+  ['id', 'رقم الطالب في الموقع (لا تعدّله)', 18],
 ];
 
 function classify(raw: string): StudentField | null {
@@ -96,7 +96,7 @@ export async function parseStudentsFile(file: File): Promise<ParsedStudents> {
       if (f === 'birthDate' || f === 'joinedAt') {
         const d = readDate(X, get(r, c));
         if (d) s[f] = d;
-        else issues.push({ row: r + 1, name: '', message: `"${v}" مش تاريخ صحيح — اكتبه مثل 2015-03-21 أو 21/03/2015` });
+        else issues.push({ row: r + 1, name: '', message: `"${v}" ليس تاريخًا صحيحًا — اكتبه بهذا الشكل: 2015-03-21 أو 21/03/2015` });
       } else if (f === 'active') s.active = !/^(لا|no|false|0|غير فعال|منسحب)$/i.test(normalizeArabic(v));
       else if (f === 'guardianEmail') {
         const email = v.toLowerCase();
@@ -105,12 +105,12 @@ export async function parseStudentsFile(file: File): Promise<ParsedStudents> {
       } else s[f] = v;
     });
     if (!s.name) {
-      if (Object.keys(s).length > 1) issues.push({ row: r + 1, name: '', message: 'صف بدون اسم الطالب — تم تجاهله' });
+      if (Object.keys(s).length > 1) issues.push({ row: r + 1, name: '', message: 'صف دون اسم الطالب — تم تجاهله' });
       continue;
     }
     rows.push(s);
   }
   issues.forEach((i) => (i.name = rows.find((s) => s.row === i.row)?.name ?? ''));
-  if (!rows.length) throw new LogParseError('ما لقيت أي طالب داخل الملف.');
+  if (!rows.length) throw new LogParseError('لم أجد أي طالب داخل الملف.');
   return { rows, issues };
 }

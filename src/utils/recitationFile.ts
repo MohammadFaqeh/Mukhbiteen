@@ -31,7 +31,7 @@ const COLS = [
   ['revDone', 'المراجعة المسمّعة (صفحات)', 11, REV],
   ['revText', 'الصفحات المسمّعة مراجعةً (أرقام: 415-416)', 20, REV],
   ['revGrade', 'جودة المراجعة %', 10, REV],
-  ['commit', 'الالتزام والسلوك بالدوام', 14, 'FFF7EFE0'],
+  ['commit', 'الالتزام والسلوك في الدوام', 14, 'FFF7EFE0'],
   ['notes', 'ملاحظات (تظهر لولي الأمر)', 28, 'FFF7EFE0'],
   ['nextMem', 'المطلوب القادم: حفظ', 18, 'FFF6E6EA'],
   ['nextMemPages', 'المطلوب القادم: حفظ (صفحات) — للمشرف', 12, 'FFF6E6EA'],
@@ -120,12 +120,12 @@ async function buildAndDownload(rows: Row[], fileName: string) {
     q.value = {
       formula:
         `IF(${c('name')}="","",IF(${c('date')}="","⚠ التاريخ ناقص",IF(${c('att')}="","⚠ الحضور ناقص",` +
-        `IF(AND(${absent},N(${c('memDone')})+N(${c('revDone')})>0),"⚠ غائب وفيه تسميع",` +
-        `IF(${absent},"غائب — باقي الصف ما بينحسب",` +
+        `IF(AND(${absent},N(${c('memDone')})+N(${c('revDone')})>0),"⚠ غائب ومسجّل له تسميع",` +
+        `IF(${absent},"غائب — لا يُحتسب باقي الصف",` +
         `IF(AND(OR(N(${c('memDone')})>0,${c('memText')}<>""),${c('memGrade')}=""),"⚠ جودة الحفظ ناقصة",` +
         `IF(AND(OR(N(${c('revDone')})>0,${c('revText')}<>""),${c('revGrade')}=""),"⚠ جودة المراجعة ناقصة",` +
-        `IF(COUNTIFS(${L.date}$3:${L.date}$${last},${c('date')},${L.name}$3:${L.name}$${last},${c('name')})>1,"⚠ الطالب مكرر بنفس التاريخ",` +
-        `IF(AND(N(${c('memDone')})+N(${c('revDone')})=0,${c('memText')}="",${c('revText')}=""),"⚠ حاضر وما سمّع شي؟","✓")))))))))`,
+        `IF(COUNTIFS(${L.date}$3:${L.date}$${last},${c('date')},${L.name}$3:${L.name}$${last},${c('name')})>1,"⚠ الطالب مكرر في التاريخ نفسه",` +
+        `IF(AND(N(${c('memDone')})+N(${c('revDone')})=0,${c('memText')}="",${c('revText')}=""),"⚠ حاضر ولم يسمّع شيئًا؟","✓")))))))))`,
     };
     q.font = { color: { argb: 'FF8A6D1F' } };
   }
@@ -136,7 +136,7 @@ async function buildAndDownload(rows: Row[], fileName: string) {
   dv.add(range(L.att), { type: 'list', allowBlank: true, formulae: ['"حاضر,متأخر,غائب,غائب بعذر"'], showErrorMessage: true, errorTitle: 'قيمة غير معروفة', error: 'اختر: حاضر، متأخر، غائب، غائب بعذر' });
   dv.add(range(L.commit), { type: 'list', allowBlank: true, formulae: ['"ممتاز,جيد جدًا,جيد,يحتاج متابعة"'], showErrorMessage: true, errorTitle: 'قيمة غير معروفة', error: 'اختر: ممتاز، جيد جدًا، جيد، يحتاج متابعة' });
   for (const c of [L.memReq, L.memDone, L.revReq, L.revDone, L.nextMemPages, L.nextRevPages])
-    dv.add(range(c), { type: 'decimal', operator: 'between', allowBlank: true, formulae: [0, 604], showErrorMessage: true, errorTitle: 'رقم غير صحيح', error: 'عدد الصفحات رقم بين 0 و 604 (صفحات المصحف). اتركه فاضي إذا ما عليه.' });
+    dv.add(range(c), { type: 'decimal', operator: 'between', allowBlank: true, formulae: [0, 604], showErrorMessage: true, errorTitle: 'رقم غير صحيح', error: 'عدد الصفحات رقم بين 0 و 604 (صفحات المصحف). اتركه فارغًا إذا لم يكن مطلوبًا.' });
   for (const c of [L.memGrade, L.revGrade])
     dv.add(range(c), { type: 'decimal', operator: 'between', allowBlank: true, formulae: [0, 100], showErrorMessage: true, errorTitle: 'رقم غير صحيح', error: 'الجودة رقم من 0 إلى 100' });
 

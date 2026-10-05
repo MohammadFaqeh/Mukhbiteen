@@ -168,7 +168,7 @@ export default function AdminAttendance() {
   };
   const changeDate = (d: string) => {
     if (!d || d === date) return;
-    if (dirty && !confirm('عندك تعديلات ما انحفظت على هذا اليوم. تتركها وتنتقل لتاريخ ثاني؟')) return;
+    if (dirty && !confirm('لديك تعديلات غير محفوظة على هذا اليوم. هل تريد تجاهلها والانتقال إلى تاريخ آخر؟')) return;
     setDirty(false);
     clearDraft();
     setDate(d);
@@ -275,7 +275,7 @@ export default function AdminAttendance() {
       {newerSaved && (
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-800">
           <span className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 shrink-0" /> انحفظت بيانات أحدث لهذا اليوم (مثلًا من ملف Excel) بعد ما بلشت تعدّل هون.
+            <AlertTriangle className="h-4 w-4 shrink-0" /> حُفظت بيانات أحدث لهذا اليوم (من ملف Excel مثلًا) بعد أن بدأت التعديل هنا.
           </span>
           <div className="flex gap-2">
             <button className="btn-accent px-3 py-1.5 text-[12px]" onClick={showSaved}>
@@ -292,18 +292,18 @@ export default function AdminAttendance() {
         {dirty ? (
           <span className="flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 font-bold text-amber-800">
             تعديلات غير محفوظة
-            <button className="underline decoration-dotted" onClick={() => confirm('تتجاهل تعديلاتك وترجع للمحفوظ؟') && showSaved()}>
+            <button className="underline decoration-dotted" onClick={() => confirm('هل تريد تجاهل تعديلاتك والعودة إلى البيانات المحفوظة؟') && showSaved()}>
               تراجع
             </button>
           </span>
         ) : savedForDate.length > 0 ? (
           <span className="rounded-full bg-navy-800 px-3 py-1 font-bold text-white">محفوظ ✓ ({savedForDate.length} طالب)</span>
         ) : (
-          <span className="rounded-full border border-dashed border-navy-200 px-3 py-1 text-navy-500">يوم جديد — مش محفوظ بعد</span>
+          <span className="rounded-full border border-dashed border-navy-200 px-3 py-1 text-navy-500">يوم جديد — لم يُحفظ بعد</span>
         )}
         <div className="relative ml-auto w-full max-w-xs sm:w-64">
           <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-navy-300" />
-          <input className="input input-sm w-full pr-9" placeholder="ابحث عن طالب بهالصفحة…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="بحث عن طالب" />
+          <input className="input input-sm w-full pr-9" placeholder="ابحث عن طالب في هذه الصفحة…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="بحث عن طالب" />
         </div>
         <span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700">حاضر {counts.present}</span>
         <span className="rounded-full bg-amber-50 px-3 py-1 text-amber-700">متأخر {counts.late}</span>
@@ -338,7 +338,7 @@ export default function AdminAttendance() {
                     <Link
                       to={`/admin/students/${st.id}?tab=sessions${savedForDate.some((s) => s.studentId === st.id) ? `&date=${date}` : ''}`}
                       className="shrink-0 rounded-lg p-1 text-navy-300 hover:bg-navy-50 hover:text-navy-700"
-                      title="فتح سجل دوام الطالب (يفتح تعديل هذا اليوم إذا كان محفوظ)"
+                      title="فتح سجل دوام الطالب (يفتح تعديل هذا اليوم إذا كان محفوظًا)"
                       aria-label={`فتح سجل ${st.name}`}
                     >
                       <ExternalLink className="h-4 w-4" />
@@ -432,7 +432,7 @@ export default function AdminAttendance() {
         </ul>
       </section>
 
-      <p className="mt-3 text-[12px] text-navy-400">علامة أسبوع العبادات تُدخل من صفحة الطالب ← تبويب العبادات، وتدخل هنا تلقائيًا ضمن معادلة العلامة (20%). الحفظ أو المراجعة بمطلوب 0 ومسمّع 0 = غير مطلوب، ما بينحسب على الطالب.</p>
+      <p className="mt-3 text-[12px] text-navy-400">علامة أسبوع العبادات تُدخل من صفحة الطالب ← تبويب العبادات، وتدخل هنا تلقائيًا ضمن معادلة العلامة (20%). الحفظ أو المراجعة التي مطلوبها 0 ومسمّعها 0 تُعدّ غير مطلوبة، فلا تُحتسب على الطالب.</p>
 
       <div className="sticky bottom-3 z-20 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-navy-100 bg-white/95 px-5 py-3 shadow-lift backdrop-blur">
         <span className="text-[13px] text-navy-500">

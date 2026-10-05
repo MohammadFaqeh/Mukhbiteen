@@ -190,7 +190,7 @@ export default function AdminImport() {
       setTo(parsed.dates[parsed.dates.length - 1]);
       setMatches(parsed.studentNames.map((n) => ({ fileName: n, studentId: lookup(n), ignored: false })));
     } catch (x) {
-      setErr(x instanceof LogParseError ? x.message : 'تعذّر قراءة الملف. تأكد إنه بصيغة Excel (xlsx) صحيحة.');
+      setErr(x instanceof LogParseError ? x.message : 'تعذّرت قراءة الملف. تأكّد من أنه ملف Excel (xlsx) صالح.');
     } finally {
       setBusy(false);
     }
@@ -322,7 +322,7 @@ export default function AdminImport() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="استيراد سجل التسميع" subtitle="ارفع شيت سجل التسميع الأسبوعي كما هو، ويتم تحديث دوام كل الطلاب بكل التواريخ مباشرة" />
+      <PageHeader title="استيراد سجل التسميع" subtitle="ارفع ملف سجل التسميع الأسبوعي كما هو، ليُحدَّث دوام جميع الطلاب في كل التواريخ مباشرة" />
 
       {!log ? (
         <section className="card space-y-3 p-5">
@@ -331,7 +331,7 @@ export default function AdminImport() {
               <p className="flex items-center gap-2 text-[14px] font-bold text-navy-800">
                 <CalendarPlus className="h-4 w-4 text-emerald-700" /> ملف دوام جديد
               </p>
-              <p className="text-[12px] text-navy-500">أسماء كل الطلاب جاهزة بتاريخ الدوام (حاضر، ومطلوب الصفحات من آخر دوام). عبّيه وارفعه هون.</p>
+              <p className="text-[12px] text-navy-500">أسماء جميع الطلاب جاهزة بتاريخ الدوام (حاضر، والصفحات المطلوبة من آخر دوام). عبّئه ثم ارفعه هنا.</p>
               <div className="flex flex-wrap gap-2">
                 <input type="date" className="input w-44" value={fileDate} onChange={(e) => setFileDate(e.target.value)} aria-label="تاريخ الدوام" />
                 <button className="btn-ghost border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={() => download('session')} disabled={!!downloading || !fileDate}>
@@ -343,7 +343,7 @@ export default function AdminImport() {
               <p className="flex items-center gap-2 text-[14px] font-bold text-navy-800">
                 <History className="h-4 w-4 text-navy-600" /> السجل التراكمي
               </p>
-              <p className="text-[12px] text-navy-500">كل أيام الدوام المحفوظة بالموقع بملف واحد ({new Set(sessions.map((s) => s.date)).size} يوم). بتقدر تعدّل عليه وترجع ترفعه.</p>
+              <p className="text-[12px] text-navy-500">جميع أيام الدوام المحفوظة في الموقع في ملف واحد ({new Set(sessions.map((s) => s.date)).size} يوم). يمكنك التعديل عليه ثم رفعه مجددًا.</p>
               <button className="btn-ghost" onClick={() => download('all')} disabled={!!downloading || sessions.length === 0}>
                 {downloading === 'all' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} تنزيل السجل التراكمي
               </button>
@@ -361,10 +361,10 @@ export default function AdminImport() {
           )}
           <ul className="space-y-1 text-[12px] text-navy-400">
             <li className="flex items-center gap-2">
-              <FileSpreadsheet className="h-4 w-4 shrink-0" /> ارفع ملف الدوام أو السجل التراكمي كما هو: الموقع يحفظ الجديد والمعدّل بس، والأيام المحفوظة اللي ما تغيّرت ما بتنلمس.
+              <FileSpreadsheet className="h-4 w-4 shrink-0" /> ارفع ملف الدوام أو السجل التراكمي كما هو: يحفظ الموقع الجديد والمعدَّل فقط، ولا يمسّ الأيام المحفوظة التي لم تتغيّر.
             </li>
-            <li className="pr-6">الشيت القديم (أسماء الطلاب فوق الأعمدة) لسا مقبول. صف "المجموع" والصفوف الفاضية يتم تجاهلها تلقائيًا.</li>
-            <li className="pr-6">الخلية الفاضية ما بتمسح شي: الالتزام والملاحظات المدخلة بالموقع تبقى إذا ما كتبتها بالملف. والجزء المتروك فاضي (ما عليه حفظ أو مراجعة) ما بينحسب عليه.</li>
+            <li className="pr-6">الصيغة القديمة للملف (أسماء الطلاب فوق الأعمدة) ما زالت مقبولة، ويُتجاهَل صف "المجموع" والصفوف الفارغة تلقائيًا.</li>
+            <li className="pr-6">الخلية الفارغة لا تمسح شيئًا: يبقى الالتزام والملاحظات المدخلة في الموقع إن لم تُكتب في الملف، والجزء المتروك فارغًا (لا حفظ عليه ولا مراجعة) لا يُحتسب على الطالب.</li>
           </ul>
         </section>
       ) : (
@@ -392,7 +392,7 @@ export default function AdminImport() {
                 <input type="date" className="input" value={to} min={from} max={log.dates[log.dates.length - 1]} onChange={(e) => setTo(e.target.value)} />
               </label>
               <label>
-                <span className="field-label">الطالب اللي ما سمّع شيء يُسجَّل</span>
+                <span className="field-label">الطالب الذي لم يسمّع شيئًا يُسجَّل</span>
                 <Select
                   value={zeroAs}
                   onChange={(v) => setZeroAs(v as AttendanceStatus)}
@@ -403,23 +403,23 @@ export default function AdminImport() {
                 />
               </label>
               <label>
-                <span className="field-label">جودة التسميع إذا كانت فاضية بالشيت</span>
+                <span className="field-label">جودة التسميع إذا كانت فارغة في الملف</span>
                 <input type="number" min={0} max={100} className="input" value={defaultGrade} onChange={(e) => setDefaultGrade(Math.max(0, Math.min(100, Number(e.target.value) || 0)))} />
               </label>
             </div>
             <label className="flex items-center gap-2 text-[13px] text-navy-700">
               <input type="checkbox" className="h-4 w-4 accent-burgundy-600" checked={onlyNew} onChange={(e) => setOnlyNew(e.target.checked)} />
-              الأيام الجديدة فقط (لا تحدّث أي يوم مسجّل مسبقًا بالموقع حتى لو تغيّر بالملف)
+              الأيام الجديدة فقط (دون تحديث أي يوم مسجّل مسبقًا في الموقع حتى لو تغيّر في الملف)
             </label>
             <p className="text-[12px] text-navy-400">
-              الأيام المسجّلة مسبقًا واللي ما تغيّرت بالملف يتم تخطيها ({totalSame} سجل). الخلايا الفاضية بالملف ما بتمسح الالتزام والملاحظات المدخلة بالموقع. علامة اليوم تُحسب بالمعادلة الموحّدة.
+              تُتخطّى الأيام المسجّلة مسبقًا التي لم تتغيّر في الملف ({totalSame} سجل). الخلايا الفارغة في الملف لا تمسح الالتزام والملاحظات المدخلة في الموقع، وتُحسب علامة اليوم بالمعادلة الموحّدة.
             </p>
           </section>
 
           {log.issues.length > 0 && (
             <section className="card overflow-hidden">
               <div className="flex items-center gap-2 border-b border-navy-50 bg-amber-50/60 px-5 py-3 text-[13px] font-bold text-amber-800">
-                <AlertTriangle className="h-4 w-4" /> {log.issues.length} ملاحظة على الملف — راجعها، أو صحّحها بالملف وارفعه من جديد
+                <AlertTriangle className="h-4 w-4" /> {log.issues.length} ملاحظة على الملف — راجعها، أو صحّحها في الملف ثم ارفعه من جديد
               </div>
               <ul className="scrollbar-thin max-h-60 divide-y divide-navy-50 overflow-y-auto text-[12px]">
                 {log.issues.map((i, k) => (
@@ -437,7 +437,7 @@ export default function AdminImport() {
           {(unresolved > 0 || duplicateTarget) && (
             <p className="flex items-center gap-2 rounded-xl bg-amber-50 px-3 py-2 text-[12px] text-amber-700">
               <AlertTriangle className="h-4 w-4 shrink-0" />
-              {duplicateTarget ? 'فيه اسمين بالملف مربوطين بنفس الطالب — صحّح الربط قبل الاستيراد.' : 'فيه أسماء ما طابقت أي طالب بالموقع — حدّد الطالب الصحيح، أو أضفه كطالب جديد، أو تجاهل الاسم.'}
+              {duplicateTarget ? 'يوجد اسمان في الملف مرتبطان بالطالب نفسه — صحّح الربط قبل الاستيراد.' : 'توجد أسماء لا تطابق أي طالب في الموقع — حدّد الطالب الصحيح، أو أضفه طالبًا جديدًا، أو تجاهل الاسم.'}
             </p>
           )}
 
@@ -446,10 +446,10 @@ export default function AdminImport() {
               <table className="w-full min-w-[980px] text-[13px]">
                 <thead className="bg-navy-50/60 text-right text-[12px] text-navy-500">
                   <tr>
-                    <th className="px-5 py-3 font-medium">الاسم بالملف</th>
-                    <th className="px-3 py-3 font-medium">الطالب بالموقع</th>
+                    <th className="px-5 py-3 font-medium">الاسم في الملف</th>
+                    <th className="px-3 py-3 font-medium">الطالب في الموقع</th>
                     <th className="px-3 py-3 font-medium">أيام جديدة</th>
-                    <th className="px-3 py-3 font-medium">أيام تتحدّث</th>
+                    <th className="px-3 py-3 font-medium">أيام ستُحدَّث</th>
                     <th className="px-3 py-3 font-medium">بدون تغيير</th>
                     <th className="px-3 py-3 font-medium">المطلوب القادم</th>
                     <th className="px-3 py-3 font-medium">الحفظ (مطلوب / مسمّع)</th>
@@ -503,7 +503,7 @@ export default function AdminImport() {
 
           <div className="sticky bottom-3 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-navy-100 bg-white/95 px-5 py-3 shadow-lift backdrop-blur">
             <span className="text-[13px] text-navy-500">
-              {totalRows + totalReqs === 0 ? 'لا يوجد أي جديد بالملف — كل شيء محفوظ مسبقًا' : `${totalRows} سجل دوام${totalReqs ? ` + ${totalReqs} مطلوب قادم` : ''} جاهز للحفظ`}
+              {totalRows + totalReqs === 0 ? 'لا يوجد أي جديد في الملف — كل البيانات محفوظة مسبقًا' : `${totalRows} سجل دوام${totalReqs ? ` + ${totalReqs} مطلوب قادم` : ''} جاهز للحفظ`}
             </span>
             <button className="btn-accent px-10 py-3 text-[15px]" onClick={runImport} disabled={busy || totalRows + totalReqs === 0 || unresolved > 0 || duplicateTarget}>
               {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <UploadCloud className="h-5 w-5" />} استيراد وحفظ
@@ -515,7 +515,7 @@ export default function AdminImport() {
       <section className="card overflow-hidden">
         <div className="border-b border-navy-50 px-5 py-4">
           <h3 className="section-title">أيام الدوام المسجّلة</h3>
-          <p className="text-[12px] text-navy-400">لحذف دوام يوم كامل لكل الطلاب (مثلًا تاريخ انكتب غلط بالشيت). لحذف يوم لطالب واحد: صفحة الطالب ← تبويب الدوام.</p>
+          <p className="text-[12px] text-navy-400">لحذف دوام يوم كامل لجميع الطلاب (كتاريخ كُتب خطأً في الملف). ولحذف يوم لطالب واحد: صفحة الطالب ← تبويب الدوام.</p>
         </div>
         {days.length === 0 ? (
           <p className="p-6 text-center text-navy-400">لا يوجد أي دوام مسجّل بعد.</p>

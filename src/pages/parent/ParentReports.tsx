@@ -17,7 +17,7 @@ export default function ParentReports() {
   });
   return (
     <div>
-      <PageHeader title="التقارير" subtitle="ملخص أداء الطالب حسب الأشهر، وتحميل تقرير شهري PDF" />
+      <PageHeader title="التقارير" subtitle="ملخص أداء الطالب حسب الأشهر، وتحميل تقرير PDF لأي فترة" />
       <div className="grid gap-4 lg:grid-cols-12">
         <ReportsPanel student={student} className="lg:col-span-4" />
         <section className="card p-5 lg:col-span-8">

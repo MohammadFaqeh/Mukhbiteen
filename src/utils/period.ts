@@ -24,6 +24,6 @@ export function periodPresets(sessions: SessionRecord[]): Period[] {
   return [
     { key: 'month', label: 'هذا الشهر', from: firstDayOfMonth(TODAY), to: TODAY },
     { key: 'last3', label: 'آخر 3 أشهر', from: addMonths(TODAY, -3), to: TODAY },
-    { key: 'term', label: 'الفصل كامل', from: earliest, to: TODAY },
+    { key: 'term', label: 'الفصل كاملًا', from: earliest, to: TODAY },
   ];
 }

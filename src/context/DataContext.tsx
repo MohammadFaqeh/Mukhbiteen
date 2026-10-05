@@ -74,7 +74,7 @@ function storagePath(url: string | undefined, bucket: string) {
 const empty: AppData = { students: [], sessions: [], dailyWorship: [], nextRequirements: [], activities: [], honorBoards: [], tajweedMaterials: [] };
 
 /** رسالة واضحة لما تكون قاعدة البيانات أقدم من الكود (أعمدة/جداول جديدة بـ schema.sql لم تُنفَّذ بعد) */
-const SCHEMA_HINT = 'قاعدة البيانات تحتاج تحديث: افتح supabase/schema.sql وشغّله كاملًا من SQL Editor بـ Supabase ثم أعد المحاولة.';
+const SCHEMA_HINT = 'قاعدة البيانات تحتاج إلى تحديث: افتح supabase/schema.sql وشغّله كاملًا من SQL Editor في Supabase، ثم أعد المحاولة.';
 const schemaError = (msg: string, cols: RegExp) => new Error(cols.test(msg) ? SCHEMA_HINT : msg);
 
 export function DataProvider({ children }: { children: ReactNode }) {

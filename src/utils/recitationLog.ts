@@ -207,7 +207,7 @@ export async function parseRecitationLog(file: File): Promise<ParsedLog> {
       fields.push(...row);
     }
   }
-  if (headerRow < 0) throw new LogParseError('لم أجد صف العناوين (حفظ مطلوب، حفظ مسمّع، مراجعة مطلوبة...). تأكد إنه نفس شيت سجل التسميع.');
+  if (headerRow < 0) throw new LogParseError('لم أجد صف العناوين (حفظ مطلوب، حفظ مسمّع، مراجعة مطلوبة...). تأكّد من أنه ملف سجل التسميع نفسه.');
 
   const findCol = (rows: number[], word: string) => {
     for (let c = range.s.c; c <= range.e.c; c++) for (const r of rows) if (r >= 0 && normalizeArabic(cellText(sheet, X, r, c)).includes(word)) return c;
@@ -268,14 +268,14 @@ export async function parseRecitationLog(file: File): Promise<ParsedLog> {
     }
   }
 
-  if (!entries.length) throw new LogParseError('ما لقيت أي بيانات تسميع داخل الملف.');
+  if (!entries.length) throw new LogParseError('لم أجد أي بيانات تسميع داخل الملف.');
 
   // نفس الطالب بنفس التاريخ مرتين: يُعتمد الصف الأخير مع تنبيه
   const byKey = new Map<string, LogEntry>();
   entries.forEach((e) => {
     const key = `${normalizeArabic(e.studentName)}|${e.date}`;
     const before = byKey.get(key);
-    if (before) issues.push({ ...where(e), message: `الطالب مكرّر بنفس التاريخ (الصف ${before.row} والصف ${e.row}) — تم اعتماد الصف ${e.row}` });
+    if (before) issues.push({ ...where(e), message: `الطالب مكرّر في التاريخ نفسه (الصف ${before.row} والصف ${e.row}) — تم اعتماد الصف ${e.row}` });
     byKey.set(key, e);
   });
   const unique = [...byKey.values()];
@@ -291,19 +291,19 @@ export async function parseRecitationLog(file: File): Promise<ParsedLog> {
         const label = k === 'mem' ? 'الحفظ' : 'المراجعة';
         const parsed = parsePageRanges(text);
         if (!parsed) {
-          issues.push({ ...where(e), message: `صفحات ${label} المسمّعة "${text}" مش أرقام صفحات — اكتبها مثل 415-416` });
+          issues.push({ ...where(e), message: `صفحات ${label} المسمّعة "${text}" ليست أرقام صفحات — اكتبها بهذا الشكل: 415-416` });
           return;
         }
         e[`${k}Text`] = parsed.text;
         const done = e[`${k}Completed`];
         if (done === undefined) e[`${k}Completed`] = parsed.pages;
-        else if (done !== parsed.pages) issues.push({ ...where(e), message: `${label}: مكتوب ${done} صفحات مسمّعة لكن ${parsed.text} = ${parsed.pages} — تم اعتماد ${done}` });
+        else if (done !== parsed.pages) issues.push({ ...where(e), message: `${label}: كُتب ${done} صفحات مسمّعة، لكن ${parsed.text} = ${parsed.pages} — تم اعتماد ${done}` });
       });
     const recited = (e.memCompleted ?? 0) > 0 || (e.revCompleted ?? 0) > 0;
-    if ((e.attendance === 'absent' || e.attendance === 'excused') && recited) issues.push({ ...where(e), message: 'مكتوب غائب لكن فيه صفحات مسمّعة — سيُسجَّل غائبًا بدون الصفحات' });
+    if ((e.attendance === 'absent' || e.attendance === 'excused') && recited) issues.push({ ...where(e), message: 'مسجّل غائبًا مع وجود صفحات مسمّعة — سيُسجَّل غائبًا دون الصفحات' });
     if (gradeCols && e.attendance !== 'absent' && e.attendance !== 'excused') {
-      if ((e.memCompleted ?? 0) > 0 && e.memGrade === undefined && e.grade === undefined) issues.push({ ...where(e), message: 'سمّع حفظ بدون جودة الحفظ — ستُستخدم الجودة الافتراضية' });
-      if ((e.revCompleted ?? 0) > 0 && e.revGrade === undefined && e.grade === undefined) issues.push({ ...where(e), message: 'سمّع مراجعة بدون جودة المراجعة — ستُستخدم الجودة الافتراضية' });
+      if ((e.memCompleted ?? 0) > 0 && e.memGrade === undefined && e.grade === undefined) issues.push({ ...where(e), message: 'سمّع حفظًا دون تحديد جودة الحفظ — ستُستخدم الجودة الافتراضية' });
+      if ((e.revCompleted ?? 0) > 0 && e.revGrade === undefined && e.grade === undefined) issues.push({ ...where(e), message: 'سمّع مراجعةً دون تحديد جودة المراجعة — ستُستخدم الجودة الافتراضية' });
     }
   });
 
@@ -347,14 +347,14 @@ function assign(X: Xlsx, e: LogEntry, f: LogField, c: CellObject | undefined, is
     case 'memGrade':
     case 'revGrade': {
       const g = readGrade(c);
-      if (g === undefined && raw) issues.push({ ...where(e), message: `جودة التسميع "${raw}" مش رقم — تم تجاهلها` });
+      if (g === undefined && raw) issues.push({ ...where(e), message: `جودة التسميع "${raw}" ليست رقمًا — تم تجاهلها` });
       else if (g !== undefined && (g < 0 || g > 100)) issues.push({ ...where(e), message: `جودة التسميع ${g} خارج المدى 0-100 — تم تجاهلها` });
       else e[f] = g;
       return;
     }
     default: {
       const n = readNumber(c);
-      if (n === undefined && raw) issues.push({ ...where(e), message: `"${raw}" مش رقم بعمود عدد الصفحات — تم تجاهله` });
+      if (n === undefined && raw) issues.push({ ...where(e), message: `"${raw}" ليس رقمًا في عمود عدد الصفحات — تم تجاهله` });
       else if (n !== undefined && n < 0) issues.push({ ...where(e), message: `عدد صفحات سالب (${n}) — تم تجاهله` });
       else e[f] = n;
     }

@@ -30,7 +30,7 @@ export default class ErrorBoundary extends Component<{ children: ReactNode }, { 
     return (
       <div className="card-quiet space-y-3 p-10 text-center">
         <AlertTriangle className="mx-auto h-9 w-9 text-burgundy-500" />
-        <p className="text-[15px] font-bold text-navy-800">صار خطأ بهذه الصفحة</p>
+        <p className="text-[15px] font-bold text-navy-800">حدث خطأ في هذه الصفحة</p>
         <p className="text-[12px] text-navy-400" dir="ltr">
           {this.state.error.message}
         </p>

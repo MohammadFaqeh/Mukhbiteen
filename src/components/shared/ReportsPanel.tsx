@@ -30,7 +30,7 @@ export default function ReportsPanel({ student, className }: { student: Student;
   const presets = [
     { label: 'آخر أسبوع', from: shiftDays(TODAY, -6), to: TODAY },
     { label: 'هذا الشهر', from: `${TODAY.slice(0, 7)}-01`, to: TODAY },
-    { label: 'آخر 30 يوم', from: shiftDays(TODAY, -29), to: TODAY },
+    { label: 'آخر 30 يومًا', from: shiftDays(TODAY, -29), to: TODAY },
     { label: 'الشهر الماضي', ...lastMonthRange() },
     { label: 'من البداية', from: earliest, to: TODAY },
   ];
@@ -95,7 +95,7 @@ export default function ReportsPanel({ student, className }: { student: Student;
             <input type="date" className="input mt-1" value={to} min={from} max={TODAY} onChange={(e) => setTo(e.target.value)} />
           </label>
         </div>
-        {invalid && <p className="mt-2 text-[12px] text-burgundy-600">تاريخ البداية لازم يكون قبل تاريخ النهاية.</p>}
+        {invalid && <p className="mt-2 text-[12px] text-burgundy-600">يجب أن يكون تاريخ البداية قبل تاريخ النهاية.</p>}
       </div>
 
       <button onClick={run} disabled={busy || invalid} className="btn-primary mt-3 w-full py-3">

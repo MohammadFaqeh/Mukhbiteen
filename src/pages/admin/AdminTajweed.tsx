@@ -132,7 +132,7 @@ export default function AdminTajweed() {
       <section className="card overflow-hidden">
         <div className="border-b border-navy-50 px-5 py-4">
           <h3 className="section-title">دورات الطلاب</h3>
-          <p className="text-[12px] text-navy-400">لما يُنهي الطالب دورته اضغط "اجتاز الدورة" فتنضاف للمجتازة وينتقل للدورة التالية تلقائيًا — أو عدّل يدويًا. كل تغيير يُحفظ مباشرة ويظهر لولي الأمر</p>
+          <p className="text-[12px] text-navy-400">عندما يُنهي الطالب دورته اضغط "اجتاز الدورة"، فتُضاف إلى الدورات المجتازة وينتقل إلى الدورة التالية تلقائيًا، أو عدّل يدويًا. يُحفظ كل تغيير مباشرة ويظهر لولي الأمر.</p>
         </div>
         <div className="scrollbar-thin overflow-x-auto">
           <table className="w-full min-w-[920px] text-[13px]">
@@ -249,7 +249,7 @@ function RosterImport({ open, onClose }: { open: boolean; onClose: () => void })
             <span className="min-w-0 flex-1">
               <b className="text-navy-900">{row.name}</b>
               <span className="block text-[12px] text-navy-400">
-                {student ? (student.name === row.name ? 'مطابق بالموقع' : `بالموقع: ${student.name}`) : 'لم يُعثر عليه بالموقع — يُتجاهل'}
+                {student ? (student.name === row.name ? 'مطابق لما في الموقع' : `في الموقع: ${student.name}`) : 'لم يُعثر عليه في الموقع — سيُتجاهَل'}
               </span>
             </span>
             <span className="text-[12px] text-navy-500">
@@ -279,7 +279,7 @@ function CourseChapters() {
         <BookOpenCheck className="h-5 w-5 shrink-0 text-emerald-700" />
         <span className="flex-1">
           <span className="section-title block">دروس الدورات</span>
-          <span className="block text-[12px] text-navy-400">علّم على الدروس اللي خلصت — بتظهر لولي أمر كل طالب مسجّل بالدورة{total ? ` · ${total} درس` : ''}</span>
+          <span className="block text-[12px] text-navy-400">حدّد الدروس المُنجزة، وتظهر لولي أمر كل طالب مسجّل في الدورة{total ? ` · ${total} درس` : ''}</span>
         </span>
         <ChevronDown className={cx('h-5 w-5 shrink-0 text-navy-400 transition-transform', open && 'rotate-180')} />
       </button>
@@ -326,9 +326,9 @@ function CourseLessons({ course }: { course: TajweedCourse }) {
         <ChevronDown className={cx('h-4 w-4 shrink-0 text-navy-400 transition-transform', !open && 'rotate-90')} />
         <span className="flex-1 font-bold text-navy-900">{tajweedLabel(course)}</span>
         {busy && <Loader2 className="h-4 w-4 animate-spin text-navy-300" />}
-        <span className="text-[12px] text-navy-400">{enrolled ? `${enrolled} طالب` : ''}</span>
+        <span className="text-[12px] text-navy-400">{enrolled ? `عدد الطلاب: ${enrolled}` : ''}</span>
         <span className={cx('rounded-full px-2.5 py-0.5 text-[12px] font-bold', lessons.length && allDone ? 'bg-emerald-100 text-emerald-800' : 'bg-navy-50 text-navy-600')}>
-          {lessons.length ? `خلص ${done} من ${lessons.length}` : 'لا دروس'}
+          {lessons.length ? `أُنجز ${done} من ${lessons.length}` : 'لا توجد دروس'}
         </span>
       </button>
 
@@ -363,8 +363,8 @@ function CourseLessons({ course }: { course: TajweedCourse }) {
               )}
               <div className="flex flex-wrap items-center justify-end gap-3 pt-1 text-[12px]">
                 {lessons.length > 0 && !allDone && (
-                  <button className="font-bold text-emerald-700 hover:underline" disabled={busy} onClick={() => persist(lessons.map((l) => (l.date ? l : { ...l, date: TODAY })), 'تم تعليم كل الدروس')}>
-                    خلصت كل الدروس
+                  <button className="font-bold text-emerald-700 hover:underline" disabled={busy} onClick={() => persist(lessons.map((l) => (l.date ? l : { ...l, date: TODAY })), 'تم تسجيل إنجاز جميع الدروس')}>
+                    إنجاز جميع الدروس
                   </button>
                 )}
                 <button className="flex items-center gap-1 text-navy-400 hover:text-navy-700" onClick={() => setEditing(true)}>
@@ -401,7 +401,7 @@ function LessonsEditor({ lessons, busy, onSave, onCancel }: { lessons: TajweedCh
         </div>
       ))}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
-        <textarea className="input flex-1" rows={2} placeholder="دروس جديدة — كل درس بسطر" value={newTitles} onChange={(e) => setNewTitles(e.target.value)} />
+        <textarea className="input flex-1" rows={2} placeholder="دروس جديدة — كل درس في سطر" value={newTitles} onChange={(e) => setNewTitles(e.target.value)} />
         <button className="btn-ghost shrink-0" onClick={add} disabled={!newTitles.trim()}>
           <ListPlus className="h-4 w-4" /> إضافة
         </button>

@@ -91,7 +91,7 @@ export default function ParentTajweed() {
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <h3 className="section-title">دروس {tajweedLabel(current)}</h3>
               <span className="text-[13px] text-navy-500">
-                خلص <b className="text-navy-900">{given}</b> من <b className="text-navy-900">{chapters.length}</b> دروس
+                أنجز <b className="text-navy-900">{given}</b> من <b className="text-navy-900">{chapters.length}</b> دروس
               </span>
             </div>
             <ol className="grid gap-2 sm:grid-cols-2">
@@ -101,7 +101,7 @@ export default function ParentTajweed() {
                     {c.date ? <Check className="h-4 w-4" /> : i + 1}
                   </span>
                   <span className={cx('min-w-0 flex-1 text-[14px]', c.date ? 'font-bold text-navy-900' : 'text-navy-500')}>{c.title}</span>
-                  <span className="shrink-0 text-[12px] text-navy-400">{c.date ? 'خلص' : 'لاحقًا'}</span>
+                  <span className="shrink-0 text-[12px] text-navy-400">{c.date ? 'أُنجز' : 'لم يُنجز بعد'}</span>
                 </li>
               ))}
             </ol>

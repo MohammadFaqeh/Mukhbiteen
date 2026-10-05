@@ -160,7 +160,7 @@ function indicators(r: Report, first: string) {
       key: 'wor',
       label: 'العبادات',
       value: r.worship,
-      line: `${r.worshipDays} ${r.worshipDays === 1 ? 'يوم' : 'أيام'} مسجّل في جدول العبادات`,
+      line: `${r.worshipDays} ${r.worshipDays === 1 ? 'يوم مسجّل' : 'أيام مسجّلة'} في جدول العبادات`,
       tip: 'تعبئة جدول العبادات يوميًا وتشجيعه على الصلاة في المسجد والأذكار.',
     });
   return out;
@@ -387,7 +387,7 @@ function buildPages(root: HTMLElement, input: ReportInput) {
     const li = (t: string) => `<div style="font-size:13.5px;line-height:1.8;color:${C.ink}">• ${t}</div>`;
     p.add(`<div>${sectionTitle('الخلاصة لولي الأمر')}
       <div style="display:flex;gap:12px">
-        ${box('نقاط القوة', '#23895A', '#EAF6EF', '✓', strong.length ? strong.map((i) => li(`${i.label}: ${fmt(i.value)}%`)).join('') : li('نحتاج تحسين المؤشرات لنصل لمستوى ممتاز بإذن الله.'))}
+        ${box('نقاط القوة', '#23895A', '#EAF6EF', '✓', strong.length ? strong.map((i) => li(`${i.label}: ${fmt(i.value)}%`)).join('') : li('نحتاج إلى تحسين المؤشرات لنصل إلى مستوى ممتاز بإذن الله.'))}
         ${box('يحتاج متابعة في البيت', '#B83B3B', '#FCEEEE', '!', weak.length ? weak.map((i) => li(i.tip)).join('') : li('لا شيء'))}
       </div></div>`);
   }
@@ -439,8 +439,8 @@ function buildPages(root: HTMLElement, input: ReportInput) {
         : `<div style="padding:8px 0;font-size:13.5px;color:${C.muted};border-top:1px solid ${C.line}">لم تُنجز دروس جديدة خلال هذه الفترة</div>`;
       p.add(`<div style="margin-top:10px;border:1px solid ${C.line};border-radius:14px;padding:10px 16px;background:#fff">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-          <b style="font-size:14.5px;color:${C.navy}">الدروس اللي خلصها في ${esc(tajweedLabel(student.tajweedCurrent))} خلال الفترة</b>
-          <span style="font-size:12.5px;color:${C.muted}">خلص ${givenAll} من ${chapters.length} دروس بالدورة</span>
+          <b style="font-size:14.5px;color:${C.navy}">الدروس التي أنجزها في ${esc(tajweedLabel(student.tajweedCurrent))} خلال الفترة</b>
+          <span style="font-size:12.5px;color:${C.muted}">أنجز ${givenAll} من ${chapters.length} دروس في الدورة</span>
         </div>${body}</div>`);
     }
   }

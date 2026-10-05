@@ -47,7 +47,7 @@ export default function StudentsImportModal({ open, onClose }: { open: boolean; 
     try {
       setParsed(await parseStudentsFile(file));
     } catch (x) {
-      setErr(x instanceof LogParseError ? x.message : 'تعذّر قراءة الملف. تأكد إنه بصيغة Excel (xlsx) صحيحة.');
+      setErr(x instanceof LogParseError ? x.message : 'تعذّرت قراءة الملف. تأكّد من أنه ملف Excel (xlsx) صالح.');
     } finally {
       setBusy(false);
     }
@@ -117,11 +117,11 @@ export default function StudentsImportModal({ open, onClose }: { open: boolean; 
       onClose={close}
       size="xl"
       title="رفع بيانات الطلاب من Excel"
-      subtitle="نزّل ملف بيانات الطلاب، عدّل عليه أو أضف طلاب جدد بصفوف جديدة، وارفعه هون"
+      subtitle="نزّل ملف بيانات الطلاب، وعدّل عليه أو أضف طلابًا جددًا في صفوف جديدة، ثم ارفعه هنا"
       footer={
         parsed && (
           <div className="flex w-full flex-wrap items-center justify-between gap-3">
-            <span className="text-[13px] text-navy-500">{changes ? `${count('new')} طالب جديد، ${count('update')} تحديث، ${count('same')} بدون تغيير` : 'لا يوجد أي تغيير بالملف'}</span>
+            <span className="text-[13px] text-navy-500">{changes ? `${count('new')} طالب جديد، ${count('update')} تحديث، ${count('same')} بدون تغيير` : 'لا توجد أي تغييرات في الملف'}</span>
             <div className="flex gap-2">
               <button className="btn-ghost" onClick={() => setParsed(null)} disabled={busy}>
                 ملف آخر
@@ -147,16 +147,16 @@ export default function StudentsImportModal({ open, onClose }: { open: boolean; 
             </p>
           )}
           <ul className="list-disc space-y-1 pr-5 text-[12px] text-navy-400">
-            <li>الطالب الموجود يتعرّف عليه برقمه بالموقع (آخر عمود) أو باسمه — فتعديل الاسم نفسه آمن طالما الرقم موجود.</li>
-            <li>الخلية الفاضية ما بتمسح شي من بيانات الطالب الحالية.</li>
-            <li>طالب جديد: أضف صف جديد واترك عمود الرقم فاضي.</li>
+            <li>يُتعرَّف على الطالب الموجود برقمه في الموقع (العمود الأخير) أو باسمه، لذا يمكن تعديل الاسم بأمان ما دام الرقم موجودًا.</li>
+            <li>الخلية الفارغة لا تمسح شيئًا من بيانات الطالب الحالية.</li>
+            <li>لإضافة طالب جديد: أضف صفًا جديدًا واترك عمود الرقم فارغًا.</li>
           </ul>
         </div>
       ) : (
         <div className="space-y-3">
           {dupNames.size > 0 && (
             <p className="flex items-center gap-2 rounded-xl bg-burgundy-50 px-3 py-2 text-[12px] text-burgundy-700">
-              <AlertTriangle className="h-4 w-4 shrink-0" /> نفس الاسم مكتوب أكثر من مرة بالملف — احذف التكرار وارفعه من جديد.
+              <AlertTriangle className="h-4 w-4 shrink-0" /> الاسم نفسه مكرّر أكثر من مرة في الملف — احذف التكرار ثم ارفعه من جديد.
             </p>
           )}
           {parsed.issues.length > 0 && (
