@@ -9,8 +9,22 @@ import { cx, formatDate } from '@/utils/format';
 
 type Mode = 'period' | 'cumulative';
 
-/** تحميل تقرير الطالب PDF: عن فترة يحددها المشرف أو ولي الأمر، أو تقرير تراكمي من أول يوم مسجّل حتى اليوم */
-export default function ReportsPanel({ student, className }: { student: Student; className?: string }) {
+/** أقصى مدة لتقرير ولي الأمر: شهران */
+const PARENT_MAX_MONTHS = 2;
+
+/** نفس التاريخ قبل عدد من الأشهر (YYYY-MM-DD) */
+function monthsBefore(iso: string, months: number) {
+  const d = new Date(`${iso}T12:00:00`);
+  d.setMonth(d.getMonth() - months);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * تحميل تقرير الطالب PDF.
+ * المشرف (admin): فترة بدون حد أو تقرير تراكمي من أول يوم مسجّل حتى اليوم.
+ * ولي الأمر: فترة فقط، وبحد أقصى شهرين.
+ */
+export default function ReportsPanel({ student, admin, className }: { student: Student; admin?: boolean; className?: string }) {
   const { sessions, dailyWorship, tajweedMaterials } = useData();
   const toast = useToast();
   const mine = useMemo(() => sessions.filter((s) => s.studentId === student.id), [sessions, student.id]);
@@ -18,12 +32,15 @@ export default function ReportsPanel({ student, className }: { student: Student;
   const earliest = useMemo(() => [...mine.map((s) => s.date), ...worship.map((d) => d.date)].sort()[0] ?? TODAY, [mine, worship]);
 
   const [mode, setMode] = useState<Mode>('period');
+  const cumulative = admin && mode === 'cumulative';
   const [periodFrom, setPeriodFrom] = useState(`${TODAY.slice(0, 7)}-01`);
   const [periodTo, setPeriodTo] = useState(TODAY);
   const [busy, setBusy] = useState(false);
 
-  const { from, to } = mode === 'cumulative' ? { from: earliest, to: TODAY } : { from: periodFrom, to: periodTo };
-  const invalid = !from || !to || from > to;
+  const { from, to } = cumulative ? { from: earliest, to: TODAY } : { from: periodFrom, to: periodTo };
+  const minFrom = admin || !periodTo ? undefined : monthsBefore(periodTo, PARENT_MAX_MONTHS);
+  const tooLong = !cumulative && !!minFrom && !!periodFrom && periodFrom < minFrom;
+  const invalid = !from || !to || from > to || tooLong;
 
   const run = async () => {
     if (invalid) return;
@@ -56,6 +73,7 @@ export default function ReportsPanel({ student, className }: { student: Student;
         </div>
       </div>
 
+      {admin && (
       <div className="grid grid-cols-2 gap-2" role="radiogroup">
         {options.map(({ key, icon: Icon, title, desc }) => (
           <button
@@ -73,20 +91,26 @@ export default function ReportsPanel({ student, className }: { student: Student;
           </button>
         ))}
       </div>
+      )}
 
-      {mode === 'period' && (
-        <div className="mt-3">
+      {!cumulative && (
+        <div className={cx(admin && 'mt-3')}>
           <div className="grid grid-cols-2 gap-2">
             <label className="text-[12px] text-navy-500">
               من تاريخ
-              <input type="date" className="input mt-1" value={periodFrom} max={periodTo || TODAY} onChange={(e) => setPeriodFrom(e.target.value)} />
+              <input type="date" className="input mt-1" value={periodFrom} min={minFrom} max={periodTo || TODAY} onChange={(e) => setPeriodFrom(e.target.value)} />
             </label>
             <label className="text-[12px] text-navy-500">
               إلى تاريخ
               <input type="date" className="input mt-1" value={periodTo} min={periodFrom} max={TODAY} onChange={(e) => setPeriodTo(e.target.value)} />
             </label>
           </div>
-          {invalid && <p className="mt-2 text-[12px] text-burgundy-600">يجب أن يكون تاريخ البداية قبل تاريخ النهاية.</p>}
+          {!admin && !tooLong && <p className="mt-2 text-[12px] text-navy-400">أقصى مدة للتقرير شهران.</p>}
+          {tooLong ? (
+            <p className="mt-2 text-[12px] text-burgundy-600">أقصى مدة للتقرير شهران، يُرجى اختيار تاريخ بداية بعد {formatDate(minFrom!)}.</p>
+          ) : (
+            invalid && <p className="mt-2 text-[12px] text-burgundy-600">يجب أن يكون تاريخ البداية قبل تاريخ النهاية.</p>
+          )}
         </div>
       )}
 
