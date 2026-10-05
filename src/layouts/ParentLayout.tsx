@@ -9,6 +9,7 @@ import Avatar from '@/components/ui/Avatar';
 import { useAuth } from '@/context/AuthContext';
 import { useData } from '@/context/DataContext';
 import { useParentStudent } from '@/hooks/useParentStudent';
+import { JuzProgressBanner } from '@/components/shared/JuzMap';
 import { useSidebarCollapsed } from '@/hooks/useSidebarCollapsed';
 import { cx } from '@/utils/format';
 
@@ -66,9 +67,13 @@ export default function ParentLayout() {
           ) : error ? (
             <p className="card-quiet p-10 text-center text-burgundy-600">تعذّر تحميل البيانات: {error}</p>
           ) : (
-            <ErrorBoundary key={pathname}>
-              <Outlet />
-            </ErrorBoundary>
+            <>
+              {/* ثابت أعلى كل صفحات ولي الأمر: كم حفظ ابنه من 30 جزءًا */}
+              {student && <JuzProgressBanner student={student} />}
+              <ErrorBoundary key={pathname}>
+                <Outlet />
+              </ErrorBoundary>
+            </>
           )}
           <Footer />
         </div>
