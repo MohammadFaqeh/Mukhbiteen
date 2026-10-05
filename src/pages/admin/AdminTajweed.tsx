@@ -1,5 +1,5 @@
 import { useMemo, useState, type ChangeEvent } from 'react';
-import { ArrowUpCircle, BookOpenCheck, CheckCircle2, ChevronDown, ExternalLink, FileUp, ListPlus, Loader2, Pencil, Save, ScrollText, Trash2, UserCheck, Wand2 } from 'lucide-react';
+import { ArrowUpCircle, BookOpenCheck, CheckCircle2, ChevronDown, ExternalLink, FileUp, ListPlus, Loader2, Pencil, Save, ScrollText, Trash2, UserCheck, Users, Wand2 } from 'lucide-react';
 import { useData } from '@/context/DataContext';
 import { useToast } from '@/context/ToastContext';
 import PageHeader from '@/components/shared/PageHeader';
@@ -21,6 +21,7 @@ export default function AdminTajweed() {
   const [uploading, setUploading] = useState<TajweedCourse | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [studentsOpen, setStudentsOpen] = useState(false);
 
   const active = useMemo(() => students.filter((s) => s.active), [students]);
   const material = (c: TajweedCourse) => courseMaterial(c, tajweedMaterials);
@@ -130,11 +131,18 @@ export default function AdminTajweed() {
 
       {/* دورات الطلاب */}
       <section className="card overflow-hidden">
-        <div className="border-b border-navy-50 px-5 py-4">
-          <h3 className="section-title">دورات الطلاب</h3>
-          <p className="text-[12px] text-navy-400">عندما يُنهي الطالب دورته اضغط "اجتاز الدورة"، فتُضاف إلى الدورات المجتازة وينتقل إلى الدورة التالية تلقائيًا، أو عدّل يدويًا. يُحفظ كل تغيير مباشرة ويظهر لولي الأمر.</p>
-        </div>
-        <div className="scrollbar-thin overflow-x-auto">
+        <button onClick={() => setStudentsOpen((o) => !o)} className="flex w-full items-center gap-3 px-5 py-4 text-right hover:bg-navy-50/40" aria-expanded={studentsOpen}>
+          <Users className="h-5 w-5 shrink-0 text-navy-600" />
+          <span className="flex-1">
+            <span className="section-title block">دورات الطلاب</span>
+            <span className="block text-[12px] text-navy-400">
+              عندما يُنهي الطالب دورته اضغط "اجتاز الدورة"، فتُضاف إلى الدورات المجتازة وينتقل إلى الدورة التالية تلقائيًا، أو عدّل يدويًا. يُحفظ كل تغيير مباشرة ويظهر لولي الأمر · {active.length} طالبًا
+            </span>
+          </span>
+          <ChevronDown className={cx('h-5 w-5 shrink-0 text-navy-400 transition-transform', studentsOpen && 'rotate-180')} />
+        </button>
+        {studentsOpen && (
+        <div className="scrollbar-thin overflow-x-auto border-t border-navy-50">
           <table className="w-full min-w-[920px] text-[13px]">
             <thead className="bg-navy-50/60 text-right text-[12px] text-navy-500">
               <tr>
@@ -195,6 +203,7 @@ export default function AdminTajweed() {
             </tbody>
           </table>
         </div>
+        )}
       </section>
 
       <RosterImport open={importOpen} onClose={() => setImportOpen(false)} />
