@@ -85,13 +85,13 @@ export default function ParentTajweed() {
           </ol>
         </section>
 
-        {/* فصول الدورة الحالية: اللي انأخذت وتاريخها، واللي لسا */}
+        {/* دروس الدورة الحالية: اللي انأخذت وتاريخها، واللي لسا */}
         {current && chapters.length > 0 && (
           <section className="card p-5 lg:col-span-12">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-              <h3 className="section-title">فصول {tajweedLabel(current)}</h3>
+              <h3 className="section-title">دروس {tajweedLabel(current)}</h3>
               <span className="text-[13px] text-navy-500">
-                أخذ <b className="text-navy-900">{given}</b> من <b className="text-navy-900">{chapters.length}</b> فصول
+                أخذ <b className="text-navy-900">{given}</b> من <b className="text-navy-900">{chapters.length}</b> دروس
               </span>
             </div>
             <ol className="grid gap-2 sm:grid-cols-2">

@@ -16,7 +16,7 @@ export interface ReportInput {
   student: Student;
   sessions: SessionRecord[]; // كل سجلات الطالب
   worship: DailyWorship[]; // كل عبادات الطالب
-  tajweedMaterials: TajweedMaterial[]; // لفصول دورة التجويد اللي انأخذت خلال الفترة
+  tajweedMaterials: TajweedMaterial[]; // لدروس دورة التجويد اللي انأعطت خلال الفترة
   from: string;
   to: string;
 }
@@ -424,7 +424,7 @@ function buildPages(root: HTMLElement, input: ReportInput) {
     }).join('');
     p.add(`<div>${sectionTitle('دورات التجويد', student.tajweedCurrent ? `(حاليًا: ${tajweedLabel(student.tajweedCurrent)})` : '')}<div style="display:flex;gap:8px">${steps}</div></div>`);
 
-    // فصول الدورة الحالية اللي انأخذت خلال الفترة (ثابتة للدورة، فكل طالب مسجّل فيها يتبعها)
+    // دروس الدورة الحالية اللي انأعطت خلال الفترة (ثابتة للدورة، فكل طالب مسجّل فيها يتبعها)
     const chapters = tajweedMaterials.find((m) => m.course === student.tajweedCurrent)?.chapters ?? [];
     if (chapters.length) {
       const inPeriod = chapters.filter((c) => c.date && c.date >= from && c.date <= to).sort((a, b) => a.date!.localeCompare(b.date!));
@@ -436,11 +436,11 @@ function buildPages(root: HTMLElement, input: ReportInput) {
                 `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid ${C.line}"><span style="color:#23895A;font-weight:800">✓</span><span style="flex:1;font-size:13.5px;color:${C.ink}">${esc(c.title)}</span><span style="font-size:12px;color:${C.muted}">${formatDayMonth(c.date!)}</span></div>`,
             )
             .join('')
-        : `<div style="padding:8px 0;font-size:13.5px;color:${C.muted};border-top:1px solid ${C.line}">لم تُعطَ فصول جديدة خلال هذه الفترة</div>`;
+        : `<div style="padding:8px 0;font-size:13.5px;color:${C.muted};border-top:1px solid ${C.line}">لم تُعطَ دروس جديدة خلال هذه الفترة</div>`;
       p.add(`<div style="margin-top:10px;border:1px solid ${C.line};border-radius:14px;padding:10px 16px;background:#fff">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
           <b style="font-size:14.5px;color:${C.navy}">ما أخذه في ${esc(tajweedLabel(student.tajweedCurrent))} خلال الفترة</b>
-          <span style="font-size:12.5px;color:${C.muted}">تقدّم الدورة: ${givenAll} من ${chapters.length} فصول</span>
+          <span style="font-size:12.5px;color:${C.muted}">تقدّم الدورة: ${givenAll} من ${chapters.length} دروس</span>
         </div>${body}</div>`);
     }
   }

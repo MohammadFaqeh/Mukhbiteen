@@ -263,8 +263,8 @@ function RosterImport({ open, onClose }: { open: boolean; onClose: () => void })
 }
 
 /**
- * فصول الدورة وتاريخ إعطاء كل فصل — ثابتة للدورة كلها (مش لكل طالب):
- * كل طالب مسجّل بالدورة بيظهر بتقريره الفصول اللي انأخذت خلال فترة التقرير.
+ * دروس الدورة — ثابتة للدورة كلها (مش لكل طالب)، وكل طالب مسجّل بالدورة يتبعها تلقائيًا.
+ * قسمين منفصلين: "قائمة الدروس" (الأسماء فقط) و"تسجيل الإعطاء" (أي درس انأخذ ومتى) — ويظهر بتقرير الطالب ما أُعطي خلال الفترة.
  */
 function CourseChapters() {
   const { students, tajweedMaterials, saveTajweedChapters } = useData();
@@ -273,6 +273,7 @@ function CourseChapters() {
   const [course, setCourse] = useState<TajweedCourse>('mutaqaddim');
   const saved = useMemo(() => tajweedMaterials.find((m) => m.course === course)?.chapters ?? [], [tajweedMaterials, course]);
   const [draft, setDraft] = useState<TajweedChapter[]>(saved);
+  const [mode, setMode] = useState<'record' | 'list'>(saved.length ? 'record' : 'list');
   const [newTitles, setNewTitles] = useState('');
   const [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -281,8 +282,11 @@ function CourseChapters() {
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
   const given = draft.filter((c) => c.date).length;
+  const allGiven = draft.length > 0 && given === draft.length;
   const enrolled = students.filter((s) => s.active && s.tajweedCurrent === course).length;
   const patch = (id: string, p: Partial<TajweedChapter>) => setDraft((d) => d.map((c) => (c.id === id ? { ...c, ...p } : c)));
+  const giveAll = () => setDraft((d) => d.map((c) => (c.date ? c : { ...c, date: TODAY })));
+  const clearAll = () => setDraft((d) => d.map(({ date: _d, ...c }) => c));
 
   const add = () => {
     const titles = newTitles.split(/\r?\n/).map((t) => t.trim()).filter(Boolean);
@@ -296,7 +300,7 @@ function CourseChapters() {
     setBusy(true);
     try {
       await saveTajweedChapters(course, draft.filter((c) => c.title.trim()).map((c) => ({ ...c, title: c.title.trim(), date: c.date || undefined })));
-      toast(`تم حفظ فصول ${tajweedLabel(course)}`);
+      toast(`تم حفظ دروس ${tajweedLabel(course)}`);
     } catch (err) {
       toast(err instanceof Error ? err.message : 'تعذّر الحفظ.');
     } finally {
@@ -304,81 +308,122 @@ function CourseChapters() {
     }
   };
 
+  const switchCourse = (v: string) => {
+    if (dirty && !confirm('في تعديلات غير محفوظة على هذه الدورة. تجاهلها؟')) return;
+    const next = v as TajweedCourse;
+    setCourse(next);
+    setMode(tajweedMaterials.find((m) => m.course === next)?.chapters?.length ? 'record' : 'list');
+  };
+
   return (
     <section className="card overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-navy-50 px-5 py-4">
         <div>
           <h3 className="section-title flex items-center gap-2">
-            <BookOpenCheck className="h-5 w-5 text-emerald-700" /> فصول الدورة وما أخذه الطلاب
+            <BookOpenCheck className="h-5 w-5 text-emerald-700" /> دروس الدورة
           </h3>
-          <p className="text-[12px] text-navy-400">
-            فصول ثابتة للدورة كلها — حدّد تاريخ إعطاء كل فصل، وبيظهر تلقائيًا بتقرير كل طالب مسجّل بالدورة ({enrolled} طالب حاليًا)
-          </p>
+          <p className="text-[12px] text-navy-400">دروس ثابتة للدورة كلها — كل طالب مسجّل بالدورة ({enrolled} طالب حاليًا) بيظهر بتقريره الدروس اللي انأعطت خلال فترة التقرير</p>
         </div>
-        <Select
-          className="w-52"
-          ariaLabel="الدورة"
-          value={course}
-          onChange={(v) => {
-            if (dirty && !confirm('في تعديلات غير محفوظة على هذه الدورة. تجاهلها؟')) return;
-            setCourse(v as TajweedCourse);
-          }}
-          options={courses.map((c) => ({ value: c.key, label: c.label }))}
-        />
+        <Select className="w-52" ariaLabel="الدورة" value={course} onChange={switchCourse} options={courses.map((c) => ({ value: c.key, label: c.label }))} />
       </div>
 
       <div className="space-y-3 p-5">
-        {draft.length > 0 && (
-          <p className="text-[13px] text-navy-500">
-            أُعطي <b className="text-navy-900">{given}</b> من <b className="text-navy-900">{draft.length}</b> فصول
-          </p>
-        )}
-        {draft.length === 0 ? (
-          <p className="rounded-xl bg-sand-50 px-4 py-3 text-[13px] text-navy-500">لم تُضف فصول لهذه الدورة بعد. اكتب أسماء الفصول تحت (كل فصل بسطر).</p>
-        ) : (
-          <ol className="space-y-2">
-            {draft.map((c, i) => (
-              <li key={c.id} className={cx('flex flex-wrap items-center gap-2 rounded-xl border p-2 sm:flex-nowrap', c.date ? 'border-emerald-200 bg-emerald-50/50' : 'border-navy-100 bg-white')}>
-                <span className="w-7 shrink-0 text-center text-[13px] font-bold text-navy-400">{i + 1}</span>
-                <input className="input min-w-0 flex-1 basis-48" value={c.title} onChange={(e) => patch(c.id, { title: e.target.value })} aria-label={`اسم الفصل ${i + 1}`} />
-                <input
-                  type="date"
-                  className="input w-40 shrink-0"
-                  value={c.date ?? ''}
-                  max={TODAY}
-                  onChange={(e) => patch(c.id, { date: e.target.value || undefined })}
-                  aria-label={`تاريخ إعطاء الفصل ${i + 1}`}
-                  title="تاريخ إعطاء الفصل (فاضي = لسا ما انأخذ)"
-                />
-                {!c.date && (
-                  <button className="btn-soft shrink-0 px-3 py-2 text-[12px] text-emerald-800" onClick={() => patch(c.id, { date: TODAY })}>
-                    <CalendarCheck className="h-4 w-4" /> أُعطي اليوم
-                  </button>
-                )}
-                <button className="shrink-0 rounded-lg p-2 text-burgundy-500 hover:bg-burgundy-50" aria-label="حذف الفصل" onClick={() => setDraft((d) => d.filter((x) => x.id !== c.id))}>
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </li>
-            ))}
-          </ol>
-        )}
-
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
-          <textarea
-            className="input min-h-[44px] flex-1"
-            rows={2}
-            placeholder="أسماء فصول جديدة — كل فصل بسطر"
-            value={newTitles}
-            onChange={(e) => setNewTitles(e.target.value)}
-          />
-          <button className="btn-ghost shrink-0" onClick={add} disabled={!newTitles.trim()}>
-            <ListPlus className="h-4 w-4" /> إضافة
-          </button>
+        <div className="inline-flex rounded-xl bg-navy-50 p-1">
+          {([
+            ['record', 'تسجيل الدروس المُعطاة'],
+            ['list', `قائمة الدروس (${draft.length})`],
+          ] as const).map(([k, label]) => (
+            <button key={k} onClick={() => setMode(k)} className={cx('rounded-lg px-4 py-2 text-[13px] font-bold transition', mode === k ? 'bg-white text-navy-900 shadow-soft' : 'text-navy-500')}>
+              {label}
+            </button>
+          ))}
         </div>
 
-        <div className="flex justify-end">
+        {mode === 'list' ? (
+          <>
+            <p className="text-[12px] text-navy-400">اكتب أسماء دروس الدورة مرة وحدة بس (بدون تواريخ). التواريخ بتنحط لاحقًا من "تسجيل الدروس المُعطاة".</p>
+            {draft.length > 0 && (
+              <ol className="space-y-2">
+                {draft.map((c, i) => (
+                  <li key={c.id} className="flex items-center gap-2">
+                    <span className="w-7 shrink-0 text-center text-[13px] font-bold text-navy-400">{i + 1}</span>
+                    <input className="input min-w-0 flex-1" value={c.title} onChange={(e) => patch(c.id, { title: e.target.value })} aria-label={`اسم الدرس ${i + 1}`} />
+                    <button
+                      className="shrink-0 rounded-lg p-2 text-burgundy-500 hover:bg-burgundy-50"
+                      aria-label="حذف الدرس"
+                      onClick={() => (!c.date || confirm(`الدرس "${c.title}" مسجّل إنه انأعطى. حذفه نهائيًا؟`)) && setDraft((d) => d.filter((x) => x.id !== c.id))}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            )}
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+              <textarea className="input flex-1" rows={3} placeholder={'أسماء دروس جديدة — كل درس بسطر\nمثال:\nأحكام الميم الساكنة'} value={newTitles} onChange={(e) => setNewTitles(e.target.value)} />
+              <button className="btn-ghost shrink-0" onClick={add} disabled={!newTitles.trim()}>
+                <ListPlus className="h-4 w-4" /> إضافة للقائمة
+              </button>
+            </div>
+          </>
+        ) : draft.length === 0 ? (
+          <p className="rounded-xl bg-sand-50 px-4 py-3 text-[13px] text-navy-500">
+            لا توجد دروس لهذه الدورة بعد.{' '}
+            <button className="font-bold text-burgundy-600 hover:underline" onClick={() => setMode('list')}>
+              أضف الدروس أولًا
+            </button>
+          </p>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[13px] text-navy-500">
+                علّم على الدروس اللي انأعطت وحدّد تاريخ كل درس — أُعطي <b className="text-navy-900">{given}</b> من <b className="text-navy-900">{draft.length}</b>
+              </p>
+              {allGiven ? (
+                <button className="btn-ghost px-3 py-1.5 text-[12px]" onClick={clearAll}>
+                  إلغاء تحديد الكل
+                </button>
+              ) : (
+                <button className="btn-soft px-3 py-1.5 text-[12px] text-emerald-800" onClick={giveAll}>
+                  <CalendarCheck className="h-4 w-4" /> تم إعطاء كل الدروس
+                </button>
+              )}
+            </div>
+            <ol className="space-y-2">
+              {draft.map((c, i) => (
+                <li key={c.id} className={cx('flex flex-wrap items-center gap-2 rounded-xl border p-2.5 sm:flex-nowrap', c.date ? 'border-emerald-200 bg-emerald-50/50' : 'border-navy-100 bg-white')}>
+                  <label className="flex min-w-0 flex-1 basis-48 cursor-pointer items-center gap-3">
+                    <input
+                      type="checkbox"
+                      className="h-5 w-5 shrink-0 accent-emerald-600"
+                      checked={!!c.date}
+                      onChange={(e) => patch(c.id, { date: e.target.checked ? TODAY : undefined })}
+                    />
+                    <span className="w-6 shrink-0 text-center text-[12px] font-bold text-navy-400">{i + 1}</span>
+                    <span className={cx('min-w-0 flex-1 text-[14px]', c.date ? 'font-bold text-navy-900' : 'text-navy-600')}>{c.title}</span>
+                  </label>
+                  {c.date ? (
+                    <input
+                      type="date"
+                      className="input w-40 shrink-0"
+                      value={c.date}
+                      max={TODAY}
+                      onChange={(e) => patch(c.id, { date: e.target.value || TODAY })}
+                      aria-label={`تاريخ إعطاء ${c.title}`}
+                    />
+                  ) : (
+                    <span className="w-40 shrink-0 text-center text-[12px] text-navy-300">لم يُعطَ بعد</span>
+                  )}
+                </li>
+              ))}
+            </ol>
+          </>
+        )}
+
+        <div className="flex items-center justify-end gap-3">
+          {dirty && <span className="text-[12px] text-amber-700">في تعديلات غير محفوظة</span>}
           <button className="btn-primary px-6" onClick={save} disabled={busy || !dirty}>
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} حفظ الفصول
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} حفظ
           </button>
         </div>
       </div>
