@@ -6,6 +6,7 @@ import { CenterLogo, ProjectLogo } from '@/components/brand/Logos';
 import StarMark from '@/components/brand/StarMark';
 import { useAuth } from '@/context/AuthContext';
 import { PROJECT } from '@/data/project';
+import InstallAppButton from '@/components/shared/InstallAppButton';
 import { resolveLoginAlias } from '@/data/loginAliases';
 
 export default function LoginPage() {
@@ -92,6 +93,7 @@ export default function LoginPage() {
             </button>
           </form>
           <p className="mt-4 text-center text-[12px] text-navy-300">لإنشاء حساب جديد أو استعادة كلمة المرور، تواصل مع مشرف المشروع.</p>
+          <InstallAppButton className="mx-auto mt-5 w-fit" />
         </section>
       </div>
     </div>

@@ -6,6 +6,7 @@
 import type { Student } from '@/types';
 import { PROJECT, supervisor } from '@/data/project';
 import { formatDate } from './format';
+import { savePdf } from './savePdf';
 
 /** "الجزء الثلاثين" — صفة العدد الترتيبي بعد "حفظ الجزء" (مجرورة) */
 const ORDINALS = [
@@ -85,7 +86,7 @@ export async function downloadJuzCertificate(student: Student, juz: number) {
     const canvas = await html2canvas(page, { scale: 2, useCORS: true, backgroundColor: '#ffffff', width: W, height: H, windowWidth: W });
     const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4', compress: true });
     pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight());
-    pdf.save(`شهادة-${juzTitle(juz).replace(/\s+/g, '-')}-${student.name.replace(/\s+/g, '-')}.pdf`);
+    await savePdf(pdf, `شهادة-${juzTitle(juz).replace(/\s+/g, '-')}-${student.name.replace(/\s+/g, '-')}.pdf`);
   } finally {
     holder.remove();
   }

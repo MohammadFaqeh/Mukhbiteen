@@ -46,13 +46,14 @@ export function useInstallApp() {
   const canInstall = !standalone && (!!deferred || ios);
 
   const install = async () => {
-    if (deferred) {
+    // الآيفون أولًا: سفاري لا يدعم التثبيت التلقائي، فنعرض الخطوات دائمًا
+    if (ios) {
+      setIosHelp(true);
+    } else if (deferred) {
       await deferred.prompt();
       await deferred.userChoice.catch(() => undefined);
       deferred = null;
       notify();
-    } else if (ios) {
-      setIosHelp(true);
     }
   };
 

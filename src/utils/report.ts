@@ -11,6 +11,7 @@ import { attendanceRate, monthKey } from './stats';
 import { dailyWorshipScore, worshipItems } from './worship';
 import { attendanceLabels, commitmentLabels, formatDate, formatDayMonth, formatMonthKey, round1, weekday } from './format';
 import { TODAY } from './today';
+import { savePdf } from './savePdf';
 
 export interface ReportInput {
   student: Student;
@@ -568,5 +569,5 @@ export async function buildReportPdf(input: ReportInput) {
 /** يبني التقرير ويحمّله كملف PDF */
 export async function downloadReport(input: ReportInput) {
   const pdf = await buildReportPdf(input);
-  pdf.save(reportFileName(input));
+  await savePdf(pdf, reportFileName(input));
 }

@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 @layer base {
-  html { -webkit-tap-highlight-color: transparent; }
+  html { -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; }
   body {
     @apply bg-paper font-sans text-ink antialiased;
     font-feature-settings: 'kern';
@@ -36,6 +36,10 @@
            transition focus:border-burgundy-300 focus:outline-none focus:ring-4 focus:ring-burgundy-100/70;
   }
   .input-sm { @apply rounded-lg px-2.5 py-1.5 text-[13px]; }
+  /* الآيفون يكبّر الصفحة تلقائيًا عند الكتابة في أي حقل خطه أصغر من 16px — على الهواتف نثبّته 16px */
+  @media (max-width: 640px) {
+    .input, .input-sm, select, textarea { font-size: 16px; }
+  }
 
   /* ---------- الأزرار ---------- */
   .btn {

@@ -1,8 +1,7 @@
 import { BookOpenCheck, CalendarCheck, HeartHandshake, MoonStar, RotateCcw, Sparkles, Star, Sunrise, Target, Medal, type LucideIcon } from 'lucide-react';
 import type { DailyWorship, SessionRecord } from '@/types';
-import { badgesMonth, monthBadges, type BadgeKey } from '@/utils/badges';
-import { formatMonthKey } from '@/utils/format';
-import { TODAY } from '@/utils/today';
+import { CYCLE_DAYS, cycleBadges, lastCycle, type BadgeKey } from '@/utils/badges';
+import { formatDayMonth } from '@/utils/format';
 
 const ICONS: Record<BadgeKey, LucideIcon> = {
   attendance: CalendarCheck,
@@ -16,11 +15,11 @@ const ICONS: Record<BadgeKey, LucideIcon> = {
   parents: HeartHandshake,
 };
 
-/** أوسمة الشهر — بطاقة هادئة لا تظهر إطلاقًا إذا لم ينل الطالب أي وسام */
-export default function MonthBadges({ sessions, worship }: { sessions: SessionRecord[]; worship: DailyWorship[] }) {
-  const month = badgesMonth(sessions, TODAY);
-  const badges = monthBadges(sessions, worship, month);
-  if (!badges.length) return null;
+/** أوسمة آخر 4 أيام دوام — بطاقة هادئة لا تظهر إطلاقًا إذا لم ينل الطالب أي وسام */
+export default function CycleBadges({ sessions, worship }: { sessions: SessionRecord[]; worship: DailyWorship[] }) {
+  const cycle = lastCycle(sessions);
+  const badges = cycle ? cycleBadges(cycle.days, worship) : [];
+  if (!cycle || !badges.length) return null;
   return (
     <section className="card p-5">
       <div className="mb-3 flex items-center gap-2.5">
@@ -28,8 +27,10 @@ export default function MonthBadges({ sessions, worship }: { sessions: SessionRe
           <Medal className="h-[18px] w-[18px]" />
         </span>
         <div>
-          <h3 className="section-title">أوسمة شهر {formatMonthKey(month).split(' ')[0]}</h3>
-          <p className="text-[12px] text-navy-400">تقديرًا لتميّز الطالب خلال الشهر</p>
+          <h3 className="section-title">أوسمة آخر {CYCLE_DAYS} أيام دوام</h3>
+          <p className="text-[12px] text-navy-400">
+            تقديرًا لتميّز الطالب من {formatDayMonth(cycle.from)} إلى {formatDayMonth(cycle.to)}
+          </p>
         </div>
       </div>
       <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">

@@ -1,11 +1,10 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { LogOut, Menu, PanelRightClose, PanelRightOpen, Share, SquarePlus, Smartphone, X, type LucideIcon } from 'lucide-react';
+import { LogOut, Menu, PanelRightClose, PanelRightOpen, X, type LucideIcon } from 'lucide-react';
 import { ProjectLogo, CenterLogo } from '@/components/brand/Logos';
 import { PROJECT } from '@/data/project';
 import { cx } from '@/utils/format';
-import { useInstallApp } from '@/hooks/useInstallApp';
-import Modal from '@/components/ui/Modal';
+import InstallAppButton from '@/components/shared/InstallAppButton';
 
 export interface NavItem {
   to: string;
@@ -60,7 +59,6 @@ function NavList({ items, onNavigate, tone, collapsed }: { items: NavItem[]; onN
 }
 
 export default function Sidebar({ items, onLogout, footer, tone, subtitle, collapsed, onToggleCollapsed }: Props) {
-  const app = useInstallApp();
   const [open, setOpen] = useState(false);
   const loc = useLocation();
   useEffect(() => {
@@ -93,16 +91,7 @@ export default function Sidebar({ items, onLogout, footer, tone, subtitle, colla
         <NavList items={items} onNavigate={onNavigate} tone={tone} collapsed={isCollapsed} />
       </div>
       {footer && !isCollapsed && <div className="mt-4">{footer}</div>}
-      {app.canInstall && (
-        <button
-          onClick={app.install}
-          title={isCollapsed ? 'تثبيت التطبيق' : undefined}
-          className={cx('mt-3 flex items-center gap-3 rounded-xl border border-gold-300/60 bg-sand-50 px-3.5 py-2.5 text-[14px] font-bold text-navy-800 transition hover:bg-sand-100', isCollapsed && 'justify-center px-0')}
-        >
-          <Smartphone className="h-[18px] w-[18px] shrink-0 text-gold-600" strokeWidth={1.8} />
-          {!isCollapsed && 'تثبيت التطبيق على الهاتف'}
-        </button>
-      )}
+      <InstallAppButton compact={isCollapsed} className="mt-3" />
       <button
         onClick={onLogout}
         title={isCollapsed ? 'تسجيل الخروج' : undefined}
@@ -122,19 +111,6 @@ export default function Sidebar({ items, onLogout, footer, tone, subtitle, colla
 
   return (
     <>
-      <Modal open={app.iosHelp} onClose={app.closeIosHelp} title="تثبيت التطبيق على الآيفون" subtitle="خطوتان فقط من متصفح Safari">
-        <ol className="space-y-3 text-[14px] text-navy-700">
-          <li className="flex items-center gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-navy-50 text-navy-700"><Share className="h-5 w-5" /></span>
-            اضغط زر المشاركة أسفل الشاشة
-          </li>
-          <li className="flex items-center gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-navy-50 text-navy-700"><SquarePlus className="h-5 w-5" /></span>
-            اختر «إضافة إلى الشاشة الرئيسية» ثم «إضافة»
-          </li>
-        </ol>
-        <p className="mt-4 text-[12px] text-navy-400">سيظهر شعار المشروع على شاشة هاتفك، ويفتح الموقع كتطبيق مستقل.</p>
-      </Modal>
       {/* Desktop */}
       <aside
         className={cx(
