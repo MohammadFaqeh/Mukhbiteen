@@ -433,14 +433,14 @@ function buildPages(root: HTMLElement, input: ReportInput) {
         ? inPeriod
             .map(
               (c) =>
-                `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid ${C.line}"><span style="color:#23895A;font-weight:800">✓</span><span style="flex:1;font-size:13.5px;color:${C.ink}">${esc(c.title)}</span><span style="font-size:12px;color:${C.muted}">${formatDayMonth(c.date!)}</span></div>`,
+                `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid ${C.line}"><span style="color:#23895A;font-weight:800">✓</span><span style="flex:1;font-size:13.5px;color:${C.ink}">${esc(c.title)}</span></div>`,
             )
             .join('')
-        : `<div style="padding:8px 0;font-size:13.5px;color:${C.muted};border-top:1px solid ${C.line}">لم تُعطَ دروس جديدة خلال هذه الفترة</div>`;
+        : `<div style="padding:8px 0;font-size:13.5px;color:${C.muted};border-top:1px solid ${C.line}">لم تُنجز دروس جديدة خلال هذه الفترة</div>`;
       p.add(`<div style="margin-top:10px;border:1px solid ${C.line};border-radius:14px;padding:10px 16px;background:#fff">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-          <b style="font-size:14.5px;color:${C.navy}">ما أخذه في ${esc(tajweedLabel(student.tajweedCurrent))} خلال الفترة</b>
-          <span style="font-size:12.5px;color:${C.muted}">تقدّم الدورة: ${givenAll} من ${chapters.length} دروس</span>
+          <b style="font-size:14.5px;color:${C.navy}">الدروس اللي خلصها في ${esc(tajweedLabel(student.tajweedCurrent))} خلال الفترة</b>
+          <span style="font-size:12.5px;color:${C.muted}">خلص ${givenAll} من ${chapters.length} دروس بالدورة</span>
         </div>${body}</div>`);
     }
   }
