@@ -4,6 +4,7 @@ import type { SessionRecord } from '@/types';
 import { AttendanceBadge } from '@/components/ui/Badge';
 import SessionDetail from '@/components/shared/SessionDetail';
 import { cx, formatDayMonth, weekday } from '@/utils/format';
+import { pageShortfall } from '@/utils/quran';
 
 /** آخر أيام الدوام كخط زمني أفقي */
 export default function SessionTimeline({ sessions, limit = 8, title = 'آخر أيام الدوام', studentName }: { sessions: SessionRecord[]; limit?: number; title?: string; studentName?: string }) {
@@ -20,12 +21,16 @@ export default function SessionTimeline({ sessions, limit = 8, title = 'آخر �
           <span className="absolute inset-x-0 top-[18px] h-px bg-navy-100" aria-hidden />
           {list.map((s, i) => {
             const ok = s.attendance === 'present' || s.attendance === 'late';
+            const memShort = ok ? pageShortfall(s.memorization) : null;
+            const revShort = ok ? pageShortfall(s.revision) : null;
+            const short = memShort || revShort;
+            const none = (memShort?.none ?? true) && (revShort?.none ?? true);
             return (
               <li key={s.id} className="relative w-[150px]">
                 <span className={cx('relative z-10 mx-auto mb-3 block h-3 w-3 rounded-full ring-4 ring-white', i === 0 ? 'bg-burgundy-600' : ok ? 'bg-navy-700' : 'bg-navy-200')} />
                 <button
                   onClick={() => setOpen(s)}
-                  className={cx('w-full rounded-2xl border p-3 text-right transition hover:-translate-y-0.5 hover:shadow-soft', i === 0 ? 'border-burgundy-200 bg-burgundy-50/40' : 'border-navy-100 bg-white')}
+                  className={cx('w-full rounded-2xl border p-3 text-right transition hover:-translate-y-0.5 hover:shadow-soft', short ? (none ? 'border-burgundy-300 bg-burgundy-50/40' : 'border-amber-300 bg-amber-50/40') : i === 0 ? 'border-burgundy-200 bg-burgundy-50/40' : 'border-navy-100 bg-white')}
                 >
                   <p className="text-[11px] text-navy-400">{weekday(s.date)}</p>
                   <p className="text-[16px] font-bold text-navy-900">{formatDayMonth(s.date)}</p>
@@ -35,7 +40,9 @@ export default function SessionTimeline({ sessions, limit = 8, title = 'آخر �
                       <p>
                         علامة اليوم: <b className="text-navy-900">{s.score}/100</b>
                       </p>
-                      {s.memorization && <p>الحفظ: {s.memorization.completion}%</p>}
+                      {s.memorization && !memShort && <p>الحفظ: {s.memorization.completion}%</p>}
+                      {memShort && <p className={cx('font-bold', memShort.none ? 'text-burgundy-700' : 'text-amber-700')}>الحفظ: {memShort.done} من {memShort.required} ص</p>}
+                      {revShort && <p className={cx('font-bold', revShort.none ? 'text-burgundy-700' : 'text-amber-700')}>المراجعة: {revShort.done} من {revShort.required} ص</p>}
                     </div>
                   ) : (
                     <p className="mt-3 text-[12px] text-navy-300">لا توجد علامات</p>

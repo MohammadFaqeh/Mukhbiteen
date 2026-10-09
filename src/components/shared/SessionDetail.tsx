@@ -4,7 +4,7 @@ import type { SessionRecord } from '@/types';
 import Modal from '@/components/ui/Modal';
 import { AttendanceBadge, CommitmentBadge, CompletionBadge } from '@/components/ui/Badge';
 import { ProgressBar } from '@/components/ui/Progress';
-import { completionStatus } from '@/utils/quran';
+import { completionStatus, pageShortfall } from '@/utils/quran';
 import { formatLongDate } from '@/utils/format';
 
 function Block({ icon: Icon, title, children }: { icon: typeof BookOpen; title: string; children: ReactNode }) {
@@ -16,6 +16,16 @@ function Block({ icon: Icon, title, children }: { icon: typeof BookOpen; title: 
       </p>
       {children}
     </div>
+  );
+}
+/** تنبيه تقصير واضح لولي الأمر: كم سمّع من أصل كم */
+function Shortfall({ part, label }: { part: { requiredPages?: number; completedPages?: number } | null | undefined; label: string }) {
+  const f = pageShortfall(part);
+  if (!f) return null;
+  return (
+    <p className={`mb-2 rounded-xl px-3 py-2 text-[13px] font-bold ${f.none ? 'bg-burgundy-50 text-burgundy-700' : 'bg-amber-50 text-amber-700'}`}>
+      {f.none ? `لم يُنجز ${label}: المطلوب ${f.required} صفحات` : `قصّر في ${label}: أنجز ${f.done} من أصل ${f.required} صفحات (ينقصه ${f.missing})`}
+    </p>
   );
 }
 function KV({ k, v }: { k: string; v: ReactNode }) {
@@ -69,6 +79,7 @@ export default function SessionDetail({ session, onClose, studentName }: { sessi
               <Block icon={BookOpen} title="الحفظ">
                 {s.memorization ? (
                   <>
+                    <Shortfall part={s.memorization} label="الحفظ" />
                     <KV k="الحفظ المطلوب" v={s.memorization.required} />
                     <KV k="تم التسميع" v={s.memorization.recited} />
                     <KV k="عدد الصفحات (مطلوب/منجز)" v={`${s.memorization.requiredPages} / ${s.memorization.completedPages}`} />
@@ -88,6 +99,7 @@ export default function SessionDetail({ session, onClose, studentName }: { sessi
               <Block icon={RotateCcw} title="المراجعة">
                 {s.revision ? (
                   <>
+                    <Shortfall part={s.revision} label="المراجعة" />
                     <KV k="المراجعة" v={s.revision.required} />
                     <KV k="ما تمت مراجعته" v={s.revision.revised} />
                     <KV k="عدد الصفحات (مطلوب/منجز)" v={`${s.revision.requiredPages} / ${s.revision.completedPages}`} />

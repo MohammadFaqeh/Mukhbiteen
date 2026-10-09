@@ -59,3 +59,14 @@ export function parsePageRanges(raw: string): { text: string; pages: number } | 
   }
   return { text: out.join('، '), pages };
 }
+
+/**
+ * تقصير جزء (حفظ/مراجعة) عن عدد الصفحات المطلوبة: null إذا أتمّ المطلوب أو لم يُحدَّد عدد صفحات.
+ * يُستخدم لإبراز التقصير لولي الأمر (سمّع كذا من أصل كذا).
+ */
+export function pageShortfall(p: { requiredPages?: number; completedPages?: number } | null | undefined) {
+  const required = p?.requiredPages ?? 0;
+  const done = p?.completedPages ?? 0;
+  if (required <= 0 || done >= required) return null;
+  return { required, done, missing: required - done, none: done <= 0 };
+}
