@@ -37,7 +37,7 @@ export default function RecitationStatusCard({ studentId, sessions, assignments,
         </div>
         {!full && items.length > 0 && (
           <Link to="/parent/next" className="flex items-center gap-1 text-[12px] font-bold text-burgundy-600 hover:underline">
-            كل المطلوبات <ChevronLeft className="h-3.5 w-3.5" />
+            عرض المطلوب عند الكل <ChevronLeft className="h-3.5 w-3.5" />
           </Link>
         )}
       </header>

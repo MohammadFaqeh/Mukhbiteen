@@ -17,7 +17,7 @@ import { cx } from '@/utils/format';
 
 const items: NavItem[] = [
   { to: '/parent', label: 'الرئيسية', icon: House, end: true },
-  { to: '/parent/next', label: 'المطلوبات', icon: CalendarClock },
+  { to: '/parent/next', label: 'المطلوب عند الكل', icon: CalendarClock },
   { to: '/parent/quran', label: 'الحفظ والمراجعة', icon: BookOpenText },
   { to: '/parent/worship', label: 'العبادات', icon: HandHeart },
   { to: '/parent/tajweed', label: 'التجويد', icon: ScrollText },

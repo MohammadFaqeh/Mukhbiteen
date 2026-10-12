@@ -11,7 +11,7 @@ export default function ParentNext() {
   const last = sessions.find((s) => s.memorization);
   return (
     <div>
-      <PageHeader title="المطلوب والمطلوبات" subtitle={`الواجب المحدد من المشرف للطالب ${student?.name ?? ''}`} />
+      <PageHeader title="المطلوب عند الكل" subtitle={`الواجبات والمطلوبات المحددة من المشرف للطالب ${student?.name ?? ''}`} />
       <NextSessionTicket req={requirement} />
       {student && (
         <div className="mt-5">
