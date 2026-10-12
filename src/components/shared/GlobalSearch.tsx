@@ -1,4 +1,5 @@
-import { useDeferredValue, useMemo, useRef, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
@@ -7,6 +8,12 @@ import { useNotifications } from '@/context/NotificationsContext';
 import Avatar from '@/components/ui/Avatar';
 import { buildSearchIndex, kindLabels, searchIndex } from '@/utils/search';
 import { cx } from '@/utils/format';
+
+interface DropdownPosition {
+  top: number;
+  left: number;
+  width: number;
+}
 
 /**
  * بحث شامل أعلى الموقع: الطلاب، أولياء الأمور، المجموعات، المطلوبات، سجلات التسميع، الأنشطة، الإشعارات والصفحات —
@@ -20,6 +27,7 @@ export default function GlobalSearch({ className }: { className?: string }) {
   const [q, setQ] = useState('');
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
+  const [dropdownPosition, setDropdownPosition] = useState<DropdownPosition>();
   const input = useRef<HTMLInputElement>(null);
   const deferred = useDeferredValue(q);
   const admin = user?.role === 'admin';
@@ -30,6 +38,27 @@ export default function GlobalSearch({ className }: { className?: string }) {
   );
   const groups = useMemo(() => searchIndex(index, deferred), [index, deferred]);
   const flat = groups.flatMap((g) => g.items);
+
+  useEffect(() => {
+    if (!open || !q.trim()) return;
+    const updatePosition = () => {
+      const rect = input.current?.getBoundingClientRect();
+      if (!rect) return;
+      const width = Math.min(Math.max(rect.width, 280), window.innerWidth - 16);
+      setDropdownPosition({
+        top: rect.bottom + 4,
+        left: Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8)),
+        width,
+      });
+    };
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [open, q]);
 
   const go = (to: string) => {
     navigate(to);
@@ -69,8 +98,12 @@ export default function GlobalSearch({ className }: { className?: string }) {
         role="combobox"
         aria-expanded={open && !!q.trim()}
       />
-      {open && q.trim() && (
-        <div className="absolute inset-x-0 top-full z-40 mt-1 max-h-[min(460px,70vh)] min-w-[280px] overflow-y-auto rounded-xl border border-navy-100 bg-white shadow-lift scrollbar-thin" role="listbox">
+      {open && q.trim() && dropdownPosition && createPortal(
+        <div
+          className="fixed z-[9999] max-h-[min(460px,70vh)] overflow-y-auto rounded-xl border border-navy-100 bg-white shadow-lift scrollbar-thin"
+          style={dropdownPosition}
+          role="listbox"
+        >
           {groups.length === 0 ? (
             <p className="px-4 py-3 text-[13px] text-navy-400">لا توجد نتائج مطابقة</p>
           ) : (
@@ -105,7 +138,8 @@ export default function GlobalSearch({ className }: { className?: string }) {
               </div>
             ))
           )}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
