@@ -10,7 +10,7 @@ const LOC_TONE: Record<string, string> = {
   missed: 'bg-burgundy-50 text-burgundy-500',
 };
 
-export default function WorshipCard({ weekDays, monthAverage }: { weekDays: DailyWorship[]; monthAverage: number }) {
+export default function WorshipCard({ weekDays, monthAverage, showMonthlyAverage = true }: { weekDays: DailyWorship[]; monthAverage: number; showMonthlyAverage?: boolean }) {
   const weekScore = weekWorshipScore(weekDays);
   const latest = weekDays[weekDays.length - 1];
   const latestScore = latest ? dailyWorshipScore(latest) : 0;
@@ -37,17 +37,19 @@ export default function WorshipCard({ weekDays, monthAverage }: { weekDays: Dail
       ) : (
         <p className="mb-3 text-[12px] text-navy-400">لا يوجد تسجيل بعد لهذا الأسبوع.</p>
       )}
-      <div className="mt-auto grid grid-cols-2 gap-3">
+      <div className={cx('mt-auto grid gap-3', showMonthlyAverage ? 'grid-cols-2' : 'grid-cols-1')}>
         <div className="rounded-xl bg-navy-50/70 p-3">
           <p className="text-[12px] text-navy-500">علامة الأسبوع</p>
           <p className="text-[22px] font-extrabold text-navy-900">{pct(weekScore)}</p>
           <ProgressBar value={weekScore} thin tone="green" />
         </div>
-        <div className="rounded-xl bg-sand-50 p-3">
-          <p className="text-[12px] text-navy-500">معدل الشهر</p>
-          <p className="text-[22px] font-extrabold text-navy-900">{pct(monthAverage)}</p>
-          <ProgressBar value={monthAverage} thin tone="gold" />
-        </div>
+        {showMonthlyAverage && (
+          <div className="rounded-xl bg-sand-50 p-3">
+            <p className="text-[12px] text-navy-500">معدل الشهر</p>
+            <p className="text-[22px] font-extrabold text-navy-900">{pct(monthAverage)}</p>
+            <ProgressBar value={monthAverage} thin tone="gold" />
+          </div>
+        )}
       </div>
       {latest && (
         <div className="mt-3 rounded-xl bg-navy-50/40 p-3 text-center">
