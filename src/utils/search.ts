@@ -50,6 +50,7 @@ const ADMIN_PAGES: [string, string, string?][] = [
   ['تسجيل دوام اليوم', '/admin/attendance', 'حضور غياب تسميع علامات'],
   ['استيراد سجل التسميع', '/admin/import', 'excel اكسل ملف رفع'],
   ['المطلوبات', '/admin/assignments', 'واجب مطلوب جديد تجويد حديث درس'],
+  ['العبادات', '/admin/worship', 'صلاة اذكار جدول طلاب يومي'],
   ['الإشعارات', '/admin/notifications', 'اشعار تذكير جدولة رسائل'],
   ['الإشعارات التلقائية', '/admin/notifications?tab=auto', 'قواعد تذكير بالدوام الفجر تقصير'],
   ['التجويد', '/admin/tajweed', 'دورات احكام'],

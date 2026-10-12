@@ -22,6 +22,7 @@ import AdminImport from './pages/admin/AdminImport';
 import AdminTajweed from './pages/admin/AdminTajweed';
 import AdminAssignments from './pages/admin/AdminAssignments';
 import AdminNotifications from './pages/admin/AdminNotifications';
+import AdminWorship from './pages/admin/AdminWorship';
 
 function RequireRole({ role, children }: { role: Role; children: ReactElement }) {
   const { user } = useAuth();
@@ -61,6 +62,7 @@ export default function App() {
         <Route path="import" element={<AdminImport />} />
         <Route path="tajweed" element={<AdminTajweed />} />
         <Route path="assignments" element={<AdminAssignments />} />
+        <Route path="worship" element={<AdminWorship />} />
         <Route path="notifications" element={<AdminNotifications />} />
         <Route path="activities" element={<AdminActivities />} />
         <Route path="reports" element={<AdminReports />} />

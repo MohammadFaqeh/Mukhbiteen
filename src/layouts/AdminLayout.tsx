@@ -3,7 +3,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import ErrorBoundary from '@/components/shared/ErrorBoundary';
 import GlobalSearch from '@/components/shared/GlobalSearch';
 import NotificationBell from '@/components/shared/NotificationBell';
-import { CalendarPlus, FileSpreadsheet, FileText, GalleryHorizontalEnd, LayoutDashboard, ListChecks, ScrollText, Users } from 'lucide-react';
+import { CalendarPlus, FileSpreadsheet, FileText, GalleryHorizontalEnd, HandHeart, LayoutDashboard, ListChecks, ScrollText, Users } from 'lucide-react';
 import Sidebar, { type NavItem } from './Sidebar';
 import BrandBackground from '@/components/brand/BrandBackground';
 import Footer from '@/components/brand/Footer';
@@ -21,6 +21,7 @@ const items: NavItem[] = [
   { to: '/admin/attendance', label: 'تسجيل دوام اليوم', icon: CalendarPlus },
   { to: '/admin/import', label: 'استيراد سجل التسميع', icon: FileSpreadsheet },
   { to: '/admin/assignments', label: 'المطلوبات', icon: ListChecks },
+  { to: '/admin/worship', label: 'العبادات', icon: HandHeart },
   { to: '/admin/tajweed', label: 'التجويد', icon: ScrollText },
   { to: '/admin/activities', label: 'الصور والأنشطة', icon: GalleryHorizontalEnd },
   { to: '/admin/reports', label: 'التقارير', icon: FileText },
