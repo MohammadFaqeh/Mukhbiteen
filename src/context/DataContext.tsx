@@ -112,7 +112,7 @@ function normalizeSession(r: SessionRecord): SessionRecord {
   };
 }
 
-const ASSIGNMENT_SELECT = '*, assignment_students(*), assignment_progress(*)';
+const ASSIGNMENT_SELECT = '*, assignment_students(*)';
 
 /** رسالة واضحة لما تكون قاعدة البيانات أقدم من الكود (أعمدة/جداول جديدة بـ schema.sql لم تُنفَّذ بعد) */
 const SCHEMA_HINT = 'قاعدة البيانات تحتاج إلى تحديث: افتح supabase/schema.sql وشغّله كاملًا من SQL Editor في Supabase، ثم أعد المحاولة.';
@@ -133,7 +133,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     // نظهر شاشة "جارٍ التحميل" فقط أول مرة — أي إعادة تحميل لاحقة بالخلفية ما لازم تمسح الصفحة الحالية وتعيد بنائها
     if (!loadedOnce.current) setLoading(true);
     setError(null);
-    const [students, sessions, dailyWorship, nextRequirements, activities, honorBoards, tajweedMaterials, assignments] = await Promise.all([
+    const [students, sessions, dailyWorship, nextRequirements, activities, honorBoards, tajweedMaterials, assignments, assignmentProgressRows] = await Promise.all([
       supabase.from('students').select('*').order('name'),
       supabase.from('sessions').select('*'),
       supabase.from('daily_worship').select('*'),
@@ -142,12 +142,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
       supabase.from('honor_boards').select('*'),
       supabase.from('tajweed_materials').select('*'),
       supabase.from('assignments').select(ASSIGNMENT_SELECT).order('created_at', { ascending: false }),
+      supabase.from('assignment_progress').select('*'),
     ]);
     const firstError = [students, sessions, dailyWorship, nextRequirements, activities, honorBoards].find((r) => r.error)?.error;
     if (tajweedMaterials.error) console.warn('جدول tajweed_materials غير موجود — شغّل supabase/schema.sql', tajweedMaterials.error.message);
     // جداول المطلوبات جديدة: لو قاعدة البيانات ما تحدّثت بعد، الموقع يشتغل عادي بدونها
-    if (assignments.error) console.warn('جداول المطلوبات غير موجودة — شغّل supabase/schema.sql', assignments.error.message);
-    setAssignmentsReady(!assignments.error);
+    const assignmentError = assignments.error ?? assignmentProgressRows.error;
+    if (assignmentError) console.warn('تعذّر تحميل المطلوبات وسجلات إنجازها', assignmentError.message);
+    setAssignmentsReady(!assignmentError);
     if (firstError) {
       setError(firstError.message);
       setLoading(false);
@@ -162,7 +164,19 @@ export function DataProvider({ children }: { children: ReactNode }) {
       honorBoards: (honorBoards.data ?? []).map(honorBoardFromRow).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
       // جدول المواد جديد: لو قاعدة البيانات ما تحدّثت بعد، الموقع يشتغل عادي بدون مواد التجويد
       tajweedMaterials: tajweedMaterials.error ? [] : (tajweedMaterials.data ?? []).map(tajweedMaterialFromRow),
-      assignments: assignments.error ? [] : (assignments.data ?? []).map(assignmentFromRow),
+      assignments: assignmentError
+        ? []
+        : (() => {
+            const progressByAssignment = new Map<string, typeof assignmentProgressRows.data>();
+            for (const progress of assignmentProgressRows.data ?? []) {
+              const rows = progressByAssignment.get(progress.assignment_id) ?? [];
+              rows.push(progress);
+              progressByAssignment.set(progress.assignment_id, rows);
+            }
+            return (assignments.data ?? []).map((assignment) =>
+              assignmentFromRow({ ...assignment, assignment_progress: progressByAssignment.get(assignment.id) ?? [] }),
+            );
+          })(),
     });
     loadedOnce.current = true;
     setLoading(false);
