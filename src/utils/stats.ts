@@ -1,6 +1,7 @@
-import type { CommitmentLevel, DailyWorship, MemorizationEntry, RevisionEntry, SessionRecord } from '@/types';
+import type { Assignment, CommitmentLevel, DailyWorship, MemorizationEntry, RevisionEntry, SessionRecord, Student } from '@/types';
 import { round1 } from './format';
-import { isAssigned } from './quran';
+import { entryCompletion, hasMeasure, isAssigned } from './quran';
+import { assignmentCommitment } from './assignments';
 import { dailyWorshipScore } from './worship';
 
 const attended = (s: SessionRecord) => s.attendance === 'present' || s.attendance === 'late';
@@ -136,6 +137,46 @@ export function suggestScore(input: {
   if (quality !== undefined) items.push([10, quality]);
   const total = items.reduce((a, [w]) => a + w, 0);
   return Math.round(items.reduce((a, [w, v]) => a + w * v, 0) / total);
+}
+
+/** مقياس جماعي: القيمة + عدد الطلاب الذين دخلوا بالحساب (الطالب بلا بيانات لهذا المقياس لا يُحسب صفرًا) */
+export interface GroupMetric {
+  value: number;
+  students: number;
+}
+
+const groupAvg = (values: (number | undefined)[]): GroupMetric => {
+  const v = values.filter((x): x is number => typeof x === 'number');
+  return { value: avg(v), students: v.length };
+};
+
+/**
+ * مقاييس المجموعة — كل مقياس باسم واضح وطريقة حساب واحدة:
+ *  scores         متوسط علامات الطلاب    = مجموع المعدلات التراكمية (علامة اليوم /100) ÷ عدد الطلاب الذين لهم علامات
+ *  memorization   متوسط إنجاز الحفظ      = مجموع (متوسط نسبة إنجاز الحفظ لكل طالب) ÷ عدد الطلاب الذين لهم حفظ بمقدار محدد
+ *  revision       متوسط إنجاز المراجعة   = نفس الطريقة للمراجعة
+ *  assignments    الالتزام بالمطلوبات     = مجموع (نسبة المطلوبات المستحقة المكتملة لكل طالب) ÷ عدد الطلاب الذين لهم مطلوبات مستحقة
+ * نسبة إنجاز يوم الدوام = المنجز المعتمد ÷ المطلوب (entryCompletion) — الأيام بلا عدد صفحات مطلوب لا تدخل.
+ */
+export function groupMetrics(students: Student[], sessions: SessionRecord[], assignments: Assignment[], today: string) {
+  const per = students.map((st) => {
+    const mine = sessions.filter((s) => s.studentId === st.id && attended(s));
+    const scored = mine.filter((s) => typeof s.score === 'number');
+    const mem = mine.filter((s) => hasMeasure(s.memorization)).map((s) => entryCompletion(s.memorization!));
+    const rev = mine.filter((s) => hasMeasure(s.revision)).map((s) => entryCompletion(s.revision!));
+    return {
+      score: scored.length ? avg(scored.map((s) => s.score!)) : undefined,
+      mem: mem.length ? avg(mem) : undefined,
+      rev: rev.length ? avg(rev) : undefined,
+      assignments: assignmentCommitment(assignments, st.id, today),
+    };
+  });
+  return {
+    scores: groupAvg(per.map((p) => p.score)),
+    memorization: groupAvg(per.map((p) => p.mem)),
+    revision: groupAvg(per.map((p) => p.rev)),
+    assignments: groupAvg(per.map((p) => p.assignments)),
+  };
 }
 
 /** هل الصورة ما زالت ضمن مدة العرض في السلايد شو؟ */

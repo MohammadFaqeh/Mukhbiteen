@@ -5,6 +5,7 @@ import StudentHero from '@/components/parent/StudentHero';
 import HonorBoardCard from '@/components/parent/HonorBoardCard';
 import Slideshow from '@/components/parent/Slideshow';
 import NextSessionTicket from '@/components/parent/NextSessionTicket';
+import RecitationStatusCard from '@/components/parent/RecitationStatusCard';
 import StatsRow from '@/components/parent/StatsRow';
 import CycleBadges from '@/components/parent/CycleBadges';
 import TrendCard from '@/components/parent/TrendCard';
@@ -18,7 +19,7 @@ import { isActivityLive, monthKey } from '@/utils/stats';
 import { weekDates, weekStartOf } from '@/utils/worship';
 
 export default function ParentHome() {
-  const { student, sessions, worship, stats, requirement, activities } = useParentStudent();
+  const { student, sessions, worship, stats, requirement, activities, assignments } = useParentStudent();
   if (!student || !stats) return <p className="p-10 text-center text-navy-400">لم يتم العثور على بيانات الطالب.</p>;
   const live = activities.filter((a) => isActivityLive(a, TODAY));
   const month = stats.lastSession ? monthKey(stats.lastSession.date) : TODAY.slice(0, 7);
@@ -33,6 +34,8 @@ export default function ParentHome() {
       <HonorBoardCard />
 
       <NextSessionTicket req={requirement} />
+
+      <RecitationStatusCard studentId={student.id} sessions={sessions} assignments={assignments} />
 
       <Slideshow items={live.length ? live : activities.slice(0, 3)} className="min-h-[300px] sm:min-h-[420px] lg:min-h-[520px]" />
 

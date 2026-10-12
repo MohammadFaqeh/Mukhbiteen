@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Download, Eye, FileSpreadsheet, FileUp, LayoutGrid, List, PencilLine, Search, Trash2, UserPlus } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Download, Eye, FileSpreadsheet, FileUp, LayoutGrid, List, PencilLine, Search, Trash2, UserPlus, X } from 'lucide-react';
 import { useData } from '@/context/DataContext';
 import { useConfirmDelete } from '@/hooks/useConfirmDelete';
 import PageHeader from '@/components/shared/PageHeader';
@@ -30,13 +30,16 @@ export default function AdminStudents() {
   const [sort, setSort] = useState<Sort>('avg');
   const [view, setView] = useState<'list' | 'grid'>('list');
   const [modal, setModal] = useState<{ open: boolean; student: Student | null }>({ open: false, student: null });
+  // ?group=… من البحث الشامل: عرض طلاب مجموعة واحدة
+  const [params, setParams] = useSearchParams();
+  const group = params.get('group');
 
   const rows = useMemo(() => {
     const r = students
       .map((s) => ({ s, st: studentStats(sessions, dailyWorship, s.id) }))
-      .filter(({ s, st }) => (s.name.includes(q.trim()) || (s.guardianEmail ?? '').includes(q.trim())) && (filter === 'all' || st.commitment === filter));
+      .filter(({ s, st }) => (s.name.includes(q.trim()) || (s.guardianEmail ?? '').includes(q.trim())) && (filter === 'all' || st.commitment === filter) && (!group || s.group === group));
     return r.sort((a, b) => (sort === 'name' ? a.s.name.localeCompare(b.s.name, 'ar') : sort === 'attendance' ? b.st.attendance - a.st.attendance : b.st.cumulative - a.st.cumulative));
-  }, [students, sessions, dailyWorship, q, filter, sort]);
+  }, [students, sessions, dailyWorship, q, filter, sort, group]);
 
   return (
     <div>
@@ -67,6 +70,11 @@ export default function AdminStudents() {
       />
 
       <div className="card mb-4 flex flex-wrap items-center gap-3 p-3">
+        {group && (
+          <button className="flex items-center gap-1.5 rounded-full bg-navy-800 px-3 py-1.5 text-[12px] font-bold text-white" onClick={() => setParams({}, { replace: true })} aria-label="إلغاء فلتر المجموعة">
+            {group} <X className="h-3.5 w-3.5" />
+          </button>
+        )}
         <div className="relative min-w-[220px] flex-1">
           <Search className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-navy-300" />
           <input className="input pr-10" placeholder="ابحث باسم الطالب أو بريد ولي الأمر" value={q} onChange={(e) => setQ(e.target.value)} />

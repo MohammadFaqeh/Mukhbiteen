@@ -2,9 +2,9 @@ import type { ReactNode } from 'react';
 import { BookOpen, CalendarDays, MessageSquareText, RotateCcw } from 'lucide-react';
 import type { SessionRecord } from '@/types';
 import Modal from '@/components/ui/Modal';
-import { AttendanceBadge, CommitmentBadge, CompletionBadge } from '@/components/ui/Badge';
+import { AttendanceBadge, CommitmentBadge, PartStatusBadge } from '@/components/ui/Badge';
 import { ProgressBar } from '@/components/ui/Progress';
-import { completionStatus, pageShortfall } from '@/utils/quran';
+import { hasMeasure, isApproved, pageShortfall } from '@/utils/quran';
 import { formatLongDate } from '@/utils/format';
 
 function Block({ icon: Icon, title, children }: { icon: typeof BookOpen; title: string; children: ReactNode }) {
@@ -23,8 +23,12 @@ function Shortfall({ part, label }: { part: { requiredPages?: number; completedP
   const f = pageShortfall(part);
   if (!f) return null;
   return (
-    <p className={`mb-2 rounded-xl px-3 py-2 text-[13px] font-bold ${f.none ? 'bg-burgundy-50 text-burgundy-700' : 'bg-amber-50 text-amber-700'}`}>
-      {f.none ? `لم يُنجز ${label}: المطلوب ${f.required} صفحات` : `قصّر في ${label}: أنجز ${f.done} من أصل ${f.required} صفحات (ينقصه ${f.missing})`}
+    <p className={`mb-2 rounded-xl px-3 py-2 text-[13px] font-bold ${f.none && !f.pending ? 'bg-burgundy-50 text-burgundy-700' : 'bg-amber-50 text-amber-700'}`}>
+      {f.pending
+        ? `${label}: سمّع ${f.pending} من أصل ${f.required} صفحات لكن التسميع لم يُعتمد بعد`
+        : f.none
+          ? `لم يُنجز ${label}: المطلوب ${f.required} صفحات`
+          : `قصّر في ${label}: أنجز ${f.done} من أصل ${f.required} صفحات (ينقصه ${f.missing})`}
     </p>
   );
 }
@@ -84,12 +88,15 @@ export default function SessionDetail({ session, onClose, studentName }: { sessi
                     <KV k="تم التسميع" v={s.memorization.recited} />
                     <KV k="عدد الصفحات (مطلوب/منجز)" v={`${s.memorization.requiredPages} / ${s.memorization.completedPages}`} />
                     <KV k="تقييم التسميع" v={`${s.memorization.grade}/100`} />
-                    <div className="mt-2 flex items-center gap-2 text-[12px] text-navy-400">
-                      <ProgressBar value={s.memorization.completion} thin />
-                      {s.memorization.completion}%
-                    </div>
+                    {!isApproved(s.memorization) && <KV k="الاعتماد" v="لم يُعتمد التسميع بعد" />}
+                    {hasMeasure(s.memorization) && (
+                      <div className="mt-2 flex items-center gap-2 text-[12px] text-navy-400">
+                        <ProgressBar value={s.memorization.completion} thin />
+                        {s.memorization.completion}/100
+                      </div>
+                    )}
                     <div className="mt-2">
-                      <CompletionBadge status={completionStatus(s.memorization.completion)} />
+                      <PartStatusBadge part={s.memorization} />
                     </div>
                   </>
                 ) : (
@@ -104,12 +111,15 @@ export default function SessionDetail({ session, onClose, studentName }: { sessi
                     <KV k="ما تمت مراجعته" v={s.revision.revised} />
                     <KV k="عدد الصفحات (مطلوب/منجز)" v={`${s.revision.requiredPages} / ${s.revision.completedPages}`} />
                     <KV k="العلامة" v={`${s.revision.grade}/100`} />
-                    <div className="mt-2 flex items-center gap-2 text-[12px] text-navy-400">
-                      <ProgressBar value={s.revision.completion} thin tone="burgundy" />
-                      {s.revision.completion}%
-                    </div>
+                    {!isApproved(s.revision) && <KV k="الاعتماد" v="لم تُعتمد المراجعة بعد" />}
+                    {hasMeasure(s.revision) && (
+                      <div className="mt-2 flex items-center gap-2 text-[12px] text-navy-400">
+                        <ProgressBar value={s.revision.completion} thin tone="burgundy" />
+                        {s.revision.completion}/100
+                      </div>
+                    )}
                     <div className="mt-2">
-                      <CompletionBadge status={completionStatus(s.revision.completion)} />
+                      <PartStatusBadge part={s.revision} />
                     </div>
                   </>
                 ) : (

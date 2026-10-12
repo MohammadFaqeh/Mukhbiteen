@@ -7,6 +7,7 @@ import { ProgressBar } from '@/components/ui/Progress';
 import StatCard from '@/components/ui/StatCard';
 import { BookOpen, RotateCcw, Target } from 'lucide-react';
 import { cx, formatDate, pct } from '@/utils/format';
+import { hasMeasure, isApproved } from '@/utils/quran';
 
 export default function ParentQuran() {
   const { student, sessions, stats } = useParentStudent();
@@ -26,8 +27,8 @@ export default function ParentQuran() {
         </div>
         <div className="space-y-4 lg:col-span-7">
           <div className="grid grid-cols-3 gap-3">
-            <StatCard icon={BookOpen} label="متوسط التسميع" value={pct(stats.memorization)} tone="navy" />
-            <StatCard icon={RotateCcw} label="متوسط المراجعة" value={pct(stats.revision)} tone="burgundy" />
+            <StatCard icon={BookOpen} label="متوسط جودة الحفظ" value={pct(stats.memorization)} tone="navy" />
+            <StatCard icon={RotateCcw} label="متوسط جودة المراجعة" value={pct(stats.revision)} tone="burgundy" />
             <StatCard icon={Target} label="أيام مسجلة" value={String(sessions.filter((s) => s.memorization).length)} tone="gold" />
           </div>
           <section className="card p-5">
@@ -63,10 +64,16 @@ export default function ParentQuran() {
                         <td className="py-2.5 font-medium text-navy-800">{e.required}</td>
                         <td className="py-2.5 text-navy-600">{'recited' in e ? e.recited : e.revised}</td>
                         <td className="py-2.5">
-                          <div className="flex items-center gap-2">
-                            <ProgressBar value={e.completion} thin tone={tab === 'mem' ? 'navy' : 'burgundy'} />
-                            <span className="w-9 text-[12px] text-navy-500">{e.completion}%</span>
-                          </div>
+                          {!isApproved(e) && e.completedPages > 0 ? (
+                            <span className="text-[12px] font-bold text-amber-700">سُمّع ولم يُعتمد</span>
+                          ) : hasMeasure(e) ? (
+                            <div className="flex items-center gap-2">
+                              <ProgressBar value={e.completion} thin tone={tab === 'mem' ? 'navy' : 'burgundy'} />
+                              <span className="w-12 text-[12px] text-navy-500">{e.completion}/100</span>
+                            </div>
+                          ) : (
+                            <span className="text-[12px] text-navy-400">بلا عدد صفحات</span>
+                          )}
                         </td>
                         <td className="py-2.5 font-bold text-navy-900">{e.grade}</td>
                       </tr>

@@ -12,6 +12,7 @@ import './index.css';
 import App from './App';
 import { AuthProvider } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
+import { NotificationsProvider } from './context/NotificationsContext';
 import { ToastProvider } from './context/ToastContext';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -19,9 +20,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <BrowserRouter basename="/Mukhbiteen">
       <AuthProvider>
         <DataProvider>
-          <ToastProvider>
-            <App />
-          </ToastProvider>
+          <NotificationsProvider>
+            <ToastProvider>
+              <App />
+            </ToastProvider>
+          </NotificationsProvider>
         </DataProvider>
       </AuthProvider>
     </BrowserRouter>

@@ -19,6 +19,7 @@ import WorshipWeekGrid from '@/components/shared/WorshipWeekGrid';
 import SessionDetail from '@/components/shared/SessionDetail';
 import ReportsPanel from '@/components/shared/ReportsPanel';
 import JuzMap from '@/components/shared/JuzMap';
+import StudentAssignments from '@/components/admin/StudentAssignments';
 import SessionTimeline from '@/components/parent/SessionTimeline';
 import { studentSessions, studentStats } from '@/utils/stats';
 import { dailyWorshipScore, emptyDailyWorship, weekDates, weekStartOf, weekWorshipScore } from '@/utils/worship';
@@ -32,6 +33,7 @@ const TABS = [
   { key: 'revision', label: 'المراجعة' },
   { key: 'worship', label: 'العبادات' },
   { key: 'next', label: 'المطلوب القادم' },
+  { key: 'assignments', label: 'المطلوبات' },
   { key: 'reports', label: 'التقارير' },
 ] as const;
 type TabKey = (typeof TABS)[number]['key'];
@@ -113,6 +115,7 @@ export default function AdminStudentDetail() {
         {tab === 'revision' && <QuranTab kind="rev" studentId={id} sessions={sessions} />}
         {tab === 'worship' && <WorshipTab studentId={id} />}
         {tab === 'next' && <NextRequirementForm studentId={id} />}
+        {tab === 'assignments' && <StudentAssignments studentId={id} />}
         {tab === 'reports' && <ReportsPanel student={student} admin />}
       </div>
 
@@ -128,7 +131,7 @@ function Overview({ student, sessions, stats, name }: { student: Student; sessio
       <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <StatCard icon={Trophy} label="المعدل التراكمي" value={pct(stats.cumulative)} progress={stats.cumulative} />
         <StatCard icon={TrendingUp} label="معدل الشهر" value={pct(stats.monthAverage)} progress={stats.monthAverage} tone="burgundy" />
-        <StatCard icon={BookOpen} label="متوسط التسميع" value={pct(stats.memorization)} progress={stats.memorization} tone="gold" />
+        <StatCard icon={BookOpen} label="متوسط جودة التسميع" value={pct(stats.memorization)} progress={stats.memorization} tone="gold" />
         <StatCard icon={HandHeart} label="العبادات" value={pct(stats.worship)} progress={stats.worship} tone="green" />
       </div>
       <JuzMap student={student} editable />

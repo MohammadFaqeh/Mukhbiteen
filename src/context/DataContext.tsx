@@ -1,14 +1,30 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { Activity, DailyWorship, HonorBoard, NextRequirement, SessionRecord, Student, TajweedChapter, TajweedCourse, TajweedMaterial } from '@/types';
+import type {
+  Activity,
+  Assignment,
+  AssignmentProgress,
+  AssignmentStoredStatus,
+  DailyWorship,
+  HonorBoard,
+  NextRequirement,
+  SessionRecord,
+  Student,
+  TajweedChapter,
+  TajweedCourse,
+  TajweedMaterial,
+} from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { supabase } from '@/lib/supabase';
 import {
   activityFromRow,
   activityToRow,
+  assignmentFromRow,
+  assignmentToRow,
   dailyWorshipFromRow,
   dailyWorshipToRow,
   honorBoardFromRow,
   honorBoardToRow,
+  progressToRow,
   requirementFromRow,
   requirementToRow,
   sessionFromRow,
@@ -18,6 +34,10 @@ import {
   tajweedMaterialFromRow,
   tajweedMaterialToRow,
 } from '@/lib/mappers';
+import { entryCompletion } from '@/utils/quran';
+import { syncAutoJuz } from '@/utils/juz';
+import { assignmentProgress } from '@/utils/assignments';
+import { TODAY } from '@/utils/today';
 
 interface AppData {
   students: Student[];
@@ -27,6 +47,7 @@ interface AppData {
   activities: Activity[];
   honorBoards: HonorBoard[];
   tajweedMaterials: TajweedMaterial[];
+  assignments: Assignment[];
 }
 
 interface DataValue extends AppData {
@@ -52,6 +73,15 @@ interface DataValue extends AppData {
   deleteHonorBoard: (id: string) => Promise<void>;
   saveTajweedMaterial: (m: TajweedMaterial) => Promise<void>;
   saveTajweedChapters: (course: TajweedCourse, chapters: TajweedChapter[]) => Promise<void>;
+  /** هل جداول المطلوبات موجودة بقاعدة البيانات؟ (false = لم يُشغَّل تحديث schema.sql بعد) */
+  assignmentsReady: boolean;
+  saveAssignment: (a: Assignment, studentIds: string[]) => Promise<void>;
+  deleteAssignment: (id: string) => Promise<void>;
+  setAssignmentStatus: (assignmentId: string, studentId: string, status: AssignmentStoredStatus) => Promise<void>;
+  addAssignmentProgress: (p: AssignmentProgress) => Promise<void>;
+  deleteAssignmentProgress: (p: AssignmentProgress) => Promise<void>;
+  /** تشغيل قواعد الإشعارات التلقائية فورًا (بدل انتظار الجدولة) — لا يرمي خطأ */
+  runNotificationRules: () => Promise<void>;
 }
 
 const DataContext = createContext<DataValue | null>(null);
@@ -71,7 +101,18 @@ function storagePath(url: string | undefined, bucket: string) {
   return url && i >= 0 ? decodeURIComponent(url.slice(i + marker.length)) : null;
 }
 
-const empty: AppData = { students: [], sessions: [], dailyWorship: [], nextRequirements: [], activities: [], honorBoards: [], tajweedMaterials: [] };
+const empty: AppData = { students: [], sessions: [], dailyWorship: [], nextRequirements: [], activities: [], honorBoards: [], tajweedMaterials: [], assignments: [] };
+
+/** نسبة الإنجاز تُحسب دائمًا من المصدر الموحّد قبل الحفظ (لا تُقبل نسبة مُدخلة) */
+function normalizeSession(r: SessionRecord): SessionRecord {
+  return {
+    ...r,
+    memorization: r.memorization ? { ...r.memorization, completion: entryCompletion(r.memorization) } : r.memorization,
+    revision: r.revision ? { ...r.revision, completion: entryCompletion(r.revision) } : r.revision,
+  };
+}
+
+const ASSIGNMENT_SELECT = '*, assignment_students(*), assignment_progress(*)';
 
 /** رسالة واضحة لما تكون قاعدة البيانات أقدم من الكود (أعمدة/جداول جديدة بـ schema.sql لم تُنفَّذ بعد) */
 const SCHEMA_HINT = 'قاعدة البيانات تحتاج إلى تحديث: افتح supabase/schema.sql وشغّله كاملًا من SQL Editor في Supabase، ثم أعد المحاولة.';
@@ -83,12 +124,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const loadedOnce = useRef(false);
+  const [assignmentsReady, setAssignmentsReady] = useState(false);
+  // أحدث نسخة من البيانات للدوال غير المتزامنة (إعادة حساب الأجزاء بعد الحفظ)
+  const dataRef = useRef<AppData>(empty);
+  dataRef.current = data;
 
   const loadAll = useCallback(async () => {
     // نظهر شاشة "جارٍ التحميل" فقط أول مرة — أي إعادة تحميل لاحقة بالخلفية ما لازم تمسح الصفحة الحالية وتعيد بنائها
     if (!loadedOnce.current) setLoading(true);
     setError(null);
-    const [students, sessions, dailyWorship, nextRequirements, activities, honorBoards, tajweedMaterials] = await Promise.all([
+    const [students, sessions, dailyWorship, nextRequirements, activities, honorBoards, tajweedMaterials, assignments] = await Promise.all([
       supabase.from('students').select('*').order('name'),
       supabase.from('sessions').select('*'),
       supabase.from('daily_worship').select('*'),
@@ -96,9 +141,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
       supabase.from('activities').select('*'),
       supabase.from('honor_boards').select('*'),
       supabase.from('tajweed_materials').select('*'),
+      supabase.from('assignments').select(ASSIGNMENT_SELECT).order('created_at', { ascending: false }),
     ]);
     const firstError = [students, sessions, dailyWorship, nextRequirements, activities, honorBoards].find((r) => r.error)?.error;
     if (tajweedMaterials.error) console.warn('جدول tajweed_materials غير موجود — شغّل supabase/schema.sql', tajweedMaterials.error.message);
+    // جداول المطلوبات جديدة: لو قاعدة البيانات ما تحدّثت بعد، الموقع يشتغل عادي بدونها
+    if (assignments.error) console.warn('جداول المطلوبات غير موجودة — شغّل supabase/schema.sql', assignments.error.message);
+    setAssignmentsReady(!assignments.error);
     if (firstError) {
       setError(firstError.message);
       setLoading(false);
@@ -113,6 +162,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       honorBoards: (honorBoards.data ?? []).map(honorBoardFromRow).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
       // جدول المواد جديد: لو قاعدة البيانات ما تحدّثت بعد، الموقع يشتغل عادي بدون مواد التجويد
       tajweedMaterials: tajweedMaterials.error ? [] : (tajweedMaterials.data ?? []).map(tajweedMaterialFromRow),
+      assignments: assignments.error ? [] : (assignments.data ?? []).map(assignmentFromRow),
     });
     loadedOnce.current = true;
     setLoading(false);
@@ -164,31 +214,63 @@ export function DataProvider({ children }: { children: ReactNode }) {
       sessions: d.sessions.filter((s) => s.studentId !== id),
       dailyWorship: d.dailyWorship.filter((w) => w.studentId !== id),
       nextRequirements: d.nextRequirements.filter((r) => r.studentId !== id),
+      assignments: d.assignments.map((a) => ({ ...a, targets: a.targets.filter((t) => t.studentId !== id), progress: a.progress.filter((p) => p.studentId !== id) })),
     }));
   }, [data.students]);
 
-  const upsertSessions = useCallback(async (records: SessionRecord[]) => {
-    const { error: err } = await supabase.from('sessions').upsert(records.map(sessionToRow), { onConflict: 'id' });
-    if (err) throw new Error(err.message);
-    setData((d) => {
-      const map = new Map(d.sessions.map((s) => [s.id, s]));
+  /**
+   * إعادة حساب الأجزاء المكتملة تلقائيًا لطلاب بعد أي تغيير بالتسميع (حفظ/تعديل/حذف).
+   * فشلها لا يُفشل حفظ التسميع نفسه (مثلًا قاعدة بيانات لم تُحدَّث بعد)، وتُصحَّح عند الحفظ التالي.
+   */
+  const syncJuz = useCallback(async (studentIds: string[], sessions: SessionRecord[], assignments: Assignment[]) => {
+    for (const id of new Set(studentIds)) {
+      const st = dataRef.current.students.find((s) => s.id === id);
+      if (!st) continue;
+      const patch = syncAutoJuz(st, sessions, assignments);
+      if (!patch) continue;
+      const { error: err } = await supabase.from('students').update(studentToRow(patch)).eq('id', id);
+      if (err) {
+        console.warn('تعذّر تحديث الأجزاء المحفوظة تلقائيًا', err.message);
+        continue;
+      }
+      setData((d) => ({ ...d, students: d.students.map((s) => (s.id === id ? { ...s, ...patch } : s)) }));
+    }
+  }, []);
+
+  const runNotificationRules = useCallback(async () => {
+    const { error: err } = await supabase.rpc('run_notification_rules');
+    if (err) console.warn('تعذّر تشغيل قواعد الإشعارات', err.message);
+  }, []);
+
+  const upsertSessions = useCallback(
+    async (input: SessionRecord[]) => {
+      const records = input.map(normalizeSession);
+      const { error: err } = await supabase.from('sessions').upsert(records.map(sessionToRow), { onConflict: 'id' });
+      if (err) throw new Error(err.message);
+      const map = new Map(dataRef.current.sessions.map((s) => [s.id, s]));
       records.forEach((r) => map.set(r.id, r));
-      return { ...d, sessions: [...map.values()].sort((a, b) => b.date.localeCompare(a.date)) };
-    });
-  }, []);
+      const next = [...map.values()].sort((a, b) => b.date.localeCompare(a.date));
+      setData((d) => ({ ...d, sessions: next }));
+      await syncJuz(records.map((r) => r.studentId), next, dataRef.current.assignments);
+      void runNotificationRules();
+    },
+    [syncJuz, runNotificationRules],
+  );
 
-  const deleteSession = useCallback(async (id: string) => {
-    const { error: err } = await supabase.from('sessions').delete().eq('id', id);
-    if (err) throw new Error(err.message);
-    setData((d) => ({ ...d, sessions: d.sessions.filter((s) => s.id !== id) }));
-  }, []);
+  const deleteSessions = useCallback(
+    async (ids: string[]) => {
+      if (!ids.length) return;
+      await deleteIn('sessions', 'id', ids);
+      const set = new Set(ids);
+      const affected = dataRef.current.sessions.filter((s) => set.has(s.id)).map((s) => s.studentId);
+      const next = dataRef.current.sessions.filter((s) => !set.has(s.id));
+      setData((d) => ({ ...d, sessions: d.sessions.filter((s) => !set.has(s.id)) }));
+      await syncJuz(affected, next, dataRef.current.assignments);
+    },
+    [syncJuz],
+  );
 
-  const deleteSessions = useCallback(async (ids: string[]) => {
-    if (!ids.length) return;
-    await deleteIn('sessions', 'id', ids);
-    const set = new Set(ids);
-    setData((d) => ({ ...d, sessions: d.sessions.filter((s) => !set.has(s.id)) }));
-  }, []);
+  const deleteSession = useCallback((id: string) => deleteSessions([id]), [deleteSessions]);
 
   const upsertDailyWorship = useCallback(async (records: DailyWorship[]) => {
     let { error: err } = await supabase.from('daily_worship').upsert(records.map(dailyWorshipToRow), { onConflict: 'id' });
@@ -309,6 +391,109 @@ export function DataProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  /** إعادة تحميل مطلوب واحد من قاعدة البيانات (بعد الحفظ) */
+  const reloadAssignment = useCallback(async (id: string) => {
+    const { data: row, error: err } = await supabase.from('assignments').select(ASSIGNMENT_SELECT).eq('id', id).maybeSingle();
+    if (err) throw new Error(err.message);
+    const fresh = row ? assignmentFromRow(row) : null;
+    const rest = dataRef.current.assignments.filter((a) => a.id !== id);
+    const next = fresh ? [fresh, ...rest].sort((a, b) => b.createdAt.localeCompare(a.createdAt)) : rest;
+    setData((d) => ({ ...d, assignments: next }));
+    return { fresh, all: next };
+  }, []);
+
+  /**
+   * الحالة المخزّنة لكل طالب بالمطلوب ذي المقدار تُحسب من سجل الإنجاز (نفس دالة العرض) وتُكتب لقاعدة البيانات
+   * حتى تعتمد عليها الإشعارات التلقائية (قرب الاستحقاق/التأخر). المطلوب بلا مقدار: الحالة يدوية ولا تُلمس.
+   */
+  const syncAssignmentStatuses = useCallback(async (a: Assignment) => {
+    const changes = a.targets
+      .map((t) => ({ t, p: assignmentProgress(a, t.studentId, TODAY) }))
+      .filter(({ t, p }) => p.measure !== 'none' && p.stored !== t.status);
+    for (const { t, p } of changes) {
+      const { error: err } = await supabase.from('assignment_students').update({ status: p.stored }).eq('assignment_id', a.id).eq('student_id', t.studentId);
+      if (err) throw new Error(err.message);
+    }
+    if (!changes.length) return;
+    const map = new Map(changes.map(({ t, p }) => [t.studentId, p.stored]));
+    setData((d) => ({
+      ...d,
+      assignments: d.assignments.map((x) => (x.id === a.id ? { ...x, targets: x.targets.map((t) => ({ ...t, status: map.get(t.studentId) ?? t.status })) } : x)),
+    }));
+  }, []);
+
+  const saveAssignment = useCallback(
+    async (a: Assignment, studentIds: string[]) => {
+      const before = dataRef.current.assignments.find((x) => x.id === a.id);
+      const { error: err } = await supabase.rpc('save_assignment', { p: assignmentToRow(a), p_student_ids: studentIds });
+      if (err) throw schemaError(err.message, /save_assignment|assignments|schema cache|function/);
+      const { fresh, all } = await reloadAssignment(a.id);
+      if (fresh) await syncAssignmentStatuses(fresh);
+      // مطلوب حفظ بالصفحات (قبل التعديل أو بعده) يؤثر على حساب الأجزاء
+      if (fresh?.category === 'memorization' || before?.category === 'memorization') {
+        const ids = [...(fresh?.targets ?? []), ...(before?.targets ?? [])].map((t) => t.studentId);
+        await syncJuz(ids, dataRef.current.sessions, all);
+      }
+      void runNotificationRules();
+    },
+    [reloadAssignment, syncAssignmentStatuses, syncJuz, runNotificationRules],
+  );
+
+  const deleteAssignment = useCallback(
+    async (id: string) => {
+      const old = dataRef.current.assignments.find((a) => a.id === id);
+      const { error: err } = await supabase.from('assignments').delete().eq('id', id);
+      if (err) throw new Error(err.message);
+      const rest = dataRef.current.assignments.filter((a) => a.id !== id);
+      setData((d) => ({ ...d, assignments: d.assignments.filter((a) => a.id !== id) }));
+      if (old?.category === 'memorization') await syncJuz(old.targets.map((t) => t.studentId), dataRef.current.sessions, rest);
+    },
+    [syncJuz],
+  );
+
+  const setAssignmentStatus = useCallback(async (assignmentId: string, studentId: string, status: AssignmentStoredStatus) => {
+    const { error: err } = await supabase.from('assignment_students').update({ status }).eq('assignment_id', assignmentId).eq('student_id', studentId);
+    if (err) throw new Error(err.message);
+    setData((d) => ({
+      ...d,
+      assignments: d.assignments.map((a) => (a.id === assignmentId ? { ...a, targets: a.targets.map((t) => (t.studentId === studentId ? { ...t, status } : t)) } : a)),
+    }));
+  }, []);
+
+  /** بعد أي تغيير بسجل الإنجاز: تحديث الحالة المخزّنة + الأجزاء (لمطلوبات الحفظ بالصفحات) */
+  const afterProgressChange = useCallback(
+    async (assignmentId: string, studentId: string, progress: AssignmentProgress[]) => {
+      const old = dataRef.current.assignments.find((a) => a.id === assignmentId);
+      if (!old) return;
+      const updated: Assignment = { ...old, progress };
+      const next = dataRef.current.assignments.map((a) => (a.id === assignmentId ? updated : a));
+      setData((d) => ({ ...d, assignments: d.assignments.map((a) => (a.id === assignmentId ? { ...a, progress } : a)) }));
+      await syncAssignmentStatuses(updated);
+      if (updated.category === 'memorization') await syncJuz([studentId], dataRef.current.sessions, next);
+    },
+    [syncAssignmentStatuses, syncJuz],
+  );
+
+  const addAssignmentProgress = useCallback(
+    async (p: AssignmentProgress) => {
+      const { error: err } = await supabase.from('assignment_progress').insert(progressToRow(p));
+      if (err) throw new Error(err.message);
+      const a = dataRef.current.assignments.find((x) => x.id === p.assignmentId);
+      await afterProgressChange(p.assignmentId, p.studentId, [p, ...(a?.progress ?? [])].sort((x, y) => y.date.localeCompare(x.date)));
+    },
+    [afterProgressChange],
+  );
+
+  const deleteAssignmentProgress = useCallback(
+    async (p: AssignmentProgress) => {
+      const { error: err } = await supabase.from('assignment_progress').delete().eq('id', p.id);
+      if (err) throw new Error(err.message);
+      const a = dataRef.current.assignments.find((x) => x.id === p.assignmentId);
+      await afterProgressChange(p.assignmentId, p.studentId, (a?.progress ?? []).filter((x) => x.id !== p.id));
+    },
+    [afterProgressChange],
+  );
+
   const value = useMemo<DataValue>(
     () => ({
       ...data,
@@ -334,6 +519,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
       deleteHonorBoard,
       saveTajweedMaterial,
       saveTajweedChapters,
+      assignmentsReady,
+      saveAssignment,
+      deleteAssignment,
+      setAssignmentStatus,
+      addAssignmentProgress,
+      deleteAssignmentProgress,
+      runNotificationRules,
     }),
     [
       data,
@@ -359,6 +551,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
       deleteHonorBoard,
       saveTajweedMaterial,
       saveTajweedChapters,
+      assignmentsReady,
+      saveAssignment,
+      deleteAssignment,
+      setAssignmentStatus,
+      addAssignmentProgress,
+      deleteAssignmentProgress,
+      runNotificationRules,
     ],
   );
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

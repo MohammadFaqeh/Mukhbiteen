@@ -11,11 +11,13 @@ import { useData } from '@/context/DataContext';
 import { useParentStudent } from '@/hooks/useParentStudent';
 import { JuzProgressBanner } from '@/components/shared/JuzMap';
 import { useSidebarCollapsed } from '@/hooks/useSidebarCollapsed';
+import GlobalSearch from '@/components/shared/GlobalSearch';
+import NotificationBell from '@/components/shared/NotificationBell';
 import { cx } from '@/utils/format';
 
 const items: NavItem[] = [
   { to: '/parent', label: 'الرئيسية', icon: House, end: true },
-  { to: '/parent/next', label: 'المطلوب القادم', icon: CalendarClock },
+  { to: '/parent/next', label: 'المطلوبات', icon: CalendarClock },
   { to: '/parent/quran', label: 'الحفظ والمراجعة', icon: BookOpenText },
   { to: '/parent/worship', label: 'العبادات', icon: HandHeart },
   { to: '/parent/tajweed', label: 'التجويد', icon: ScrollText },
@@ -62,6 +64,11 @@ export default function ParentLayout() {
       />
       <main className={cx('px-4 pb-8 pt-5 transition-[margin] duration-200 sm:px-6 lg:px-10 lg:pt-8', collapsed ? 'lg:mr-[92px]' : 'lg:mr-[260px]')}>
         <div className="mx-auto max-w-[1280px]">
+          {/* شريط علوي خفيف: البحث والجرس على الجهة اليسرى (نهاية الاتجاه من اليمين لليسار) */}
+          <div className="mb-4 flex items-center justify-end gap-2">
+            <GlobalSearch className="min-w-0 flex-1 sm:max-w-xs sm:flex-none sm:basis-72" />
+            <NotificationBell />
+          </div>
           {loading ? (
             <p className="card-quiet p-10 text-center text-navy-400">جارٍ تحميل البيانات...</p>
           ) : error ? (

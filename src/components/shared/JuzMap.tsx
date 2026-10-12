@@ -1,13 +1,12 @@
 import { useState } from 'react';
-import { Award, BookMarked, Crown, Loader2 } from 'lucide-react';
+import { Award, BookMarked, Crown, Loader2, Sparkles } from 'lucide-react';
 import { useData } from '@/context/DataContext';
 import { useToast } from '@/context/ToastContext';
-import type { Student } from '@/types';
+import type { JuzSource, Student } from '@/types';
 import { cx } from '@/utils/format';
 import { TODAY } from '@/utils/today';
 import { downloadJuzCertificate, juzTitle } from '@/utils/certificate';
-
-const JUZ_COUNT = 30;
+import { JUZ_COUNT, juzSource, juzSummary } from '@/utils/juz';
 
 /** "جزء واحد" / "جزءان" / "3 أجزاء" / "11 جزءًا" — صيغة العدد الصحيحة بالعربية */
 export function juzCountLabel(n: number) {
@@ -22,6 +21,17 @@ const juzProgress = (s: Student) => {
   const count = new Set(s.memorizedJuz ?? []).size;
   return { count, percent: Math.round((count / JUZ_COUNT) * 1000) / 10, hafiz: count >= JUZ_COUNT };
 };
+
+/** "منها 5 أجزاء محفوظة قبل الالتحاق و3 أجزاء أُتمّت في المشروع" — يظهر فقط عند وجود أجزاء محفوظة سابقًا */
+function JuzBreakdown({ student }: { student: Student }) {
+  const { prior, inProject } = juzSummary(student);
+  if (!prior) return null;
+  return (
+    <p className="text-[11px] text-navy-400">
+      منها {juzCountLabel(prior)} محفوظة قبل الالتحاق{inProject ? ` و${juzCountLabel(inProject)} أُتمّت في المشروع` : ''}
+    </p>
+  );
+}
 
 /** جملة تشجيعية حسب ما تبقّى */
 function encouragement(count: number) {
@@ -81,6 +91,7 @@ export function JuzProgressBanner({ student }: { student: Student }) {
               </span>
             </p>
             <p className="text-[12px] text-navy-400">{encouragement(count)}</p>
+            <JuzBreakdown student={student} />
           </div>
         </div>
         <div className="flex min-w-[200px] flex-1 items-center gap-3">
@@ -92,9 +103,12 @@ export function JuzProgressBanner({ student }: { student: Student }) {
   );
 }
 
+const sourceTitle: Record<JuzSource, string> = { prior: 'محفوظ قبل الالتحاق', manual: 'أُتمّ في المشروع', auto: 'أُتمّ في المشروع (اكتُشف تلقائيًا من سجل التسميع)' };
+
 /**
  * حفظ القرآن الكريم بالتفصيل: خط تقدّم (من 30 جزءًا) والأجزاء الثلاثون كمربعات صغيرة.
- * editable (للمشرف): الضغط على الجزء يحدده محفوظًا أو يلغيه، ويُحفظ مباشرة مع تاريخ الإتمام (للشهادة).
+ * editable (للمشرف): اختيار نوع التحديد (محفوظ سابقًا / أُتمّ في المشروع) ثم الضغط على الجزء،
+ * أو إدخال عدد الأجزاء المحفوظة سابقًا مباشرة. الأجزاء المكتملة من سجل التسميع تُضاف تلقائيًا (بنجمة).
  * لولي الأمر: الضغط على جزء محفوظ يحمّل شهادة إتمامه.
  */
 export default function JuzMap({ student, editable }: { student: Student; editable?: boolean }) {
@@ -105,21 +119,51 @@ export default function JuzMap({ student, editable }: { student: Student; editab
   const juz = student.memorizedJuz ?? [];
   const done = new Set(juz);
   const { percent, hafiz } = juzProgress(student);
+  const { prior, inProject } = juzSummary(student);
+  const [mode, setMode] = useState<Exclude<JuzSource, 'auto'>>('manual');
+  const [priorInput, setPriorInput] = useState(String(prior));
 
-  const toggle = async (n: number) => {
-    const removing = done.has(n);
-    const next = removing ? juz.filter((x) => x !== n) : [...juz, n].sort((a, b) => a - b);
-    // تاريخ الإتمام يُسجَّل تلقائيًا يوم التحديد، ويُمسح عند الإلغاء
-    const { [String(n)]: _old, ...otherDates } = student.memorizedJuzDates ?? {};
-    const dates = removing ? otherDates : { ...otherDates, [String(n)]: TODAY };
+  const persist = async (next: number[], dates: Record<string, string>, sources: Record<string, JuzSource>) => {
     setBusy(true);
     try {
-      await updateStudent(student.id, { memorizedJuz: next, memorizedJuzDates: dates });
+      await updateStudent(student.id, { memorizedJuz: [...new Set(next)].sort((a, b) => a - b), memorizedJuzDates: dates, memorizedJuzSources: sources });
     } catch (e) {
       toast(e instanceof Error ? e.message : 'تعذّر الحفظ.');
     } finally {
       setBusy(false);
     }
+  };
+
+  /**
+   * الضغط على جزء: غير محفوظ ← يُضاف بالنوع المختار، محفوظ بنوع آخر ← يتحوّل للنوع المختار، محفوظ بنفس النوع ← يُلغى.
+   * الجزء لا يُحسب مرتين لأن الأجزاء مجموعة أرقام وليست عدّادًا.
+   */
+  const toggle = async (n: number) => {
+    const key = String(n);
+    const { [key]: _d, ...otherDates } = student.memorizedJuzDates ?? {};
+    const { [key]: _s, ...otherSources } = student.memorizedJuzSources ?? {};
+    const current = done.has(n) ? juzSource(student, n) : null;
+    if (current === mode || (current === 'auto' && mode === 'manual')) {
+      await persist(juz.filter((x) => x !== n), otherDates, otherSources);
+      return;
+    }
+    // تاريخ الإتمام (للشهادة) يُسجَّل يوم التحديد للمكتمل بالمشروع، ويُحافَظ عليه إن وُجد
+    const dates = mode === 'manual' ? { ...otherDates, [key]: student.memorizedJuzDates?.[key] ?? TODAY } : otherDates;
+    await persist([...juz, n], dates, { ...otherSources, [key]: mode });
+  };
+
+  /** عدد الأجزاء المحفوظة سابقًا: تُحدَّد من الجزء 30 نزولًا (ترتيب الحفظ المعتاد) متجاوزةً ما أُتمّ في المشروع، وتُعدَّل بالضغط */
+  const applyPriorCount = async () => {
+    const want = Math.max(0, Math.min(JUZ_COUNT, Math.floor(Number(priorInput) || 0)));
+    const inProj = juz.filter((n) => juzSource(student, n) !== 'prior');
+    const priorList: number[] = [];
+    for (let n = JUZ_COUNT; n >= 1 && priorList.length < want; n--) if (!inProj.includes(n)) priorList.push(n);
+    const sources: Record<string, JuzSource> = Object.fromEntries(Object.entries(student.memorizedJuzSources ?? {}).filter(([k]) => inProj.includes(Number(k))));
+    priorList.forEach((n) => (sources[String(n)] = 'prior'));
+    const dates = Object.fromEntries(Object.entries(student.memorizedJuzDates ?? {}).filter(([k]) => inProj.includes(Number(k))));
+    await persist([...inProj, ...priorList], dates, sources);
+    setPriorInput(String(priorList.length));
+    toast(`الأجزاء المحفوظة سابقًا: ${priorList.length}`);
   };
 
   const certificate = async (n: number) => {
@@ -143,7 +187,12 @@ export default function JuzMap({ student, editable }: { student: Student; editab
           </span>
           <div>
             <h3 className="section-title">حفظ القرآن الكريم</h3>
-            <p className="text-[12px] text-navy-400">{editable ? 'اضغط على الجزء لتحديده محفوظًا أو إلغاء تحديده' : done.size ? 'اضغط على أي جزء محفوظ لتحميل شهادة إتمامه' : 'الأجزاء التي أتمّ الطالب حفظها'}</p>
+            <p className="text-[12px] text-navy-400">{editable ? 'اختر النوع ثم اضغط على الجزء لتحديده أو إلغائه' : done.size ? 'اضغط على أي جزء محفوظ لتحميل شهادة إتمامه' : 'الأجزاء التي أتمّ الطالب حفظها'}</p>
+            {prior > 0 && (
+              <p className="text-[12px] text-navy-500">
+                محفوظة سابقًا: <b>{prior}</b> · أُتمّت في المشروع: <b>{inProject}</b>
+              </p>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2 text-[13px] text-navy-500">
@@ -163,17 +212,51 @@ export default function JuzMap({ student, editable }: { student: Student; editab
         <b className="w-12 text-left text-[13px] text-navy-800">{percent}%</b>
       </div>
 
+      {editable && (
+        <div className="mb-3 flex flex-wrap items-end gap-3 rounded-2xl bg-navy-50/60 p-3">
+          <div>
+            <span className="field-label">عند الضغط على جزء يُحدَّد كـ</span>
+            <div className="inline-flex rounded-xl bg-white p-1 ring-1 ring-navy-100">
+              {(
+                [
+                  ['manual', 'أُتمّ في المشروع'],
+                  ['prior', 'محفوظ سابقًا'],
+                ] as const
+              ).map(([k, l]) => (
+                <button key={k} type="button" onClick={() => setMode(k)} className={cx('rounded-lg px-3 py-1 text-[12px] font-bold transition', mode === k ? (k === 'prior' ? 'bg-gold-400 text-navy-900' : 'bg-navy-800 text-white') : 'text-navy-500')}>
+                  {l}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-end gap-1.5">
+            <label>
+              <span className="field-label">عدد الأجزاء المحفوظة سابقًا</span>
+              <input type="number" min={0} max={JUZ_COUNT} className="input input-sm w-20 text-center" value={priorInput} onChange={(e) => setPriorInput(e.target.value)} />
+            </label>
+            <button type="button" className="btn-soft px-3 py-1.5 text-[12px]" disabled={busy} onClick={applyPriorCount} title="تُحدَّد من الجزء 30 نزولًا، ويمكن تعديلها بالضغط على الأجزاء">
+              تطبيق
+            </button>
+          </div>
+          <p className="basis-full text-[11px] text-navy-400">
+            <Sparkles className="inline h-3 w-3" /> الجزء المعلَّم بنجمة أضافه النظام تلقائيًا: كل صفحاته سُمّعت حفظًا بتسميع معتمد (من أرقام الصفحات في خانة "ما تم تسميعه" أو مطلوبات الحفظ بالصفحات).
+          </p>
+        </div>
+      )}
+
       <div className="grid grid-cols-6 gap-1.5 sm:grid-cols-10">
         {Array.from({ length: JUZ_COUNT }, (_, i) => i + 1).map((n) => {
           const on = done.has(n);
+          const src = on ? juzSource(student, n) : null;
           const cls = cx(
-            'flex aspect-square items-center justify-center rounded-lg text-[12px] font-bold transition',
-            on ? (hafiz ? 'bg-gold-400 text-navy-900' : 'bg-navy-800 text-white shadow-soft') : 'bg-navy-50/70 text-navy-300',
+            'relative flex aspect-square items-center justify-center rounded-lg text-[12px] font-bold transition',
+            on ? (hafiz ? 'bg-gold-400 text-navy-900' : src === 'prior' ? 'bg-gold-300 text-navy-900 shadow-soft' : 'bg-navy-800 text-white shadow-soft') : 'bg-navy-50/70 text-navy-300',
             editable && (on ? 'hover:opacity-85' : 'hover:bg-navy-100 hover:text-navy-500'),
           );
           return editable ? (
-            <button key={n} type="button" disabled={busy} onClick={() => toggle(n)} className={cls} aria-pressed={on} aria-label={`الجزء ${n}`}>
+            <button key={n} type="button" disabled={busy} onClick={() => toggle(n)} className={cls} aria-pressed={on} aria-label={`الجزء ${n}`} title={src ? sourceTitle[src] : undefined}>
               {n}
+              {src === 'auto' && <Sparkles className="absolute right-0.5 top-0.5 h-2.5 w-2.5 opacity-70" />}
             </button>
           ) : on ? (
             <button
@@ -181,9 +264,9 @@ export default function JuzMap({ student, editable }: { student: Student; editab
               type="button"
               disabled={certBusy !== null}
               onClick={() => certificate(n)}
-              className={cx(cls, 'group relative hover:opacity-85')}
+              className={cx(cls, 'group hover:opacity-85')}
               aria-label={`تحميل شهادة ${juzTitle(n)}`}
-              title={`تحميل شهادة ${juzTitle(n)}`}
+              title={`${src ? sourceTitle[src] : ''} — تحميل شهادة ${juzTitle(n)}`}
             >
               {certBusy === n ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : n}
               <Award className="absolute left-0.5 top-0.5 h-2.5 w-2.5 opacity-60" />
@@ -195,6 +278,17 @@ export default function JuzMap({ student, editable }: { student: Student; editab
           );
         })}
       </div>
+
+      {prior > 0 && !hafiz && (
+        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-navy-400">
+          <span className="flex items-center gap-1.5">
+            <span className="h-3 w-3 rounded bg-navy-800" /> أُتمّ في المشروع
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-3 w-3 rounded bg-gold-300" /> محفوظ قبل الالتحاق
+          </span>
+        </div>
+      )}
     </section>
   );
 }

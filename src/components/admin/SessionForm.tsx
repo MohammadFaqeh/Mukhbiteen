@@ -3,14 +3,14 @@ import { BookOpen, Calculator, Loader2, RotateCcw, Save } from 'lucide-react';
 import type { DailyWorship, MemorizationEntry, RevisionEntry, SessionRecord } from '@/types';
 import Toggle from '@/components/ui/Toggle';
 import { ProgressBar } from '@/components/ui/Progress';
-import { CompletionBadge } from '@/components/ui/Badge';
+import { PartStatusBadge } from '@/components/ui/Badge';
 import { AttendancePicker, CommitmentSelect, Field, NumberInput } from './fields';
 import { useData } from '@/context/DataContext';
 import { useToast } from '@/context/ToastContext';
 import { TODAY } from '@/utils/today';
 import { suggestScore } from '@/utils/stats';
 import { weekDates, weekStartOf, weekWorshipScore } from '@/utils/worship';
-import { completionPercent, completionStatus, isAssigned } from '@/utils/quran';
+import { entryCompletion, isApproved, isAssigned } from '@/utils/quran';
 import { pct } from '@/utils/format';
 
 function blank(studentId: string, date = TODAY): SessionRecord {
@@ -21,8 +21,8 @@ function blank(studentId: string, date = TODAY): SessionRecord {
     attendance: 'present',
     commitment: 'excellent',
     score: undefined,
-    memorization: { required: '', recited: '', requiredPages: 0, completedPages: 0, completion: 0, grade: 90, notes: '' },
-    revision: { required: '', revised: '', requiredPages: 0, completedPages: 0, completion: 0, grade: 90, notes: '' },
+    memorization: { required: '', recited: '', requiredPages: 0, completedPages: 0, completion: 0, grade: 90, approved: true, notes: '' },
+    revision: { required: '', revised: '', requiredPages: 0, completedPages: 0, completion: 0, grade: 90, approved: true, notes: '' },
     notes: '',
   };
 }
@@ -53,13 +53,13 @@ export default function SessionForm({ studentId, initial, onSaved, onCancel }: P
   const setMem = (patch: Partial<MemorizationEntry>) =>
     setS((x) => {
       const next = { ...x.memorization!, ...patch };
-      next.completion = completionPercent(next.requiredPages, next.completedPages);
+      next.completion = entryCompletion(next);
       return { ...x, memorization: next };
     });
   const setRev = (patch: Partial<RevisionEntry>) =>
     setS((x) => {
       const next = { ...x.revision!, ...patch };
-      next.completion = completionPercent(next.requiredPages, next.completedPages);
+      next.completion = entryCompletion(next);
       return { ...x, revision: next };
     });
 
@@ -171,7 +171,10 @@ export default function SessionForm({ studentId, initial, onSaved, onCancel }: P
                   </div>
                 </Field>
                 <div className="sm:col-span-2">
-                  <CompletionBadge status={completionStatus(s.memorization?.completion ?? 0)} />
+                  <Toggle checked={isApproved(s.memorization)} onChange={(v) => setMem({ approved: v })} label="التسميع معتمد" description="غير المعتمد يظهر لولي الأمر (سُمّع ولم يُعتمد) ولا يُحسب منجزًا" />
+                </div>
+                <div className="sm:col-span-2">
+                  <PartStatusBadge part={s.memorization} />
                 </div>
                 <Field label="ملاحظات" className="sm:col-span-2">
                   <input className="input" value={s.memorization?.notes ?? ''} onChange={(e) => setMem({ notes: e.target.value })} />
@@ -210,7 +213,10 @@ export default function SessionForm({ studentId, initial, onSaved, onCancel }: P
                   </div>
                 </Field>
                 <div className="sm:col-span-2">
-                  <CompletionBadge status={completionStatus(s.revision?.completion ?? 0)} />
+                  <Toggle checked={isApproved(s.revision)} onChange={(v) => setRev({ approved: v })} label="المراجعة معتمدة" description="غير المعتمدة لا تُحسب منجزة" />
+                </div>
+                <div className="sm:col-span-2">
+                  <PartStatusBadge part={s.revision} />
                 </div>
                 <Field label="الملاحظات" className="sm:col-span-2">
                   <input className="input" value={s.revision?.notes ?? ''} onChange={(e) => setRev({ notes: e.target.value })} />

@@ -73,7 +73,17 @@ export interface Student {
   tajweedCurrent?: TajweedCourse; // الدورة المسجّل فيها حاليًا
   memorizedJuz?: number[]; // أرقام الأجزاء المحفوظة كاملة (1-30) — يحددها المشرف يدويًا
   memorizedJuzDates?: Record<string, string>; // تاريخ إتمام كل جزء (رقم الجزء ← YYYY-MM-DD) — يُكتب على شهادة الجزء
+  /** مصدر كل جزء محفوظ (رقم الجزء ← المصدر). الجزء غير الموجود هنا يُعامل كـ manual (سجلات ما قبل هذه الميزة) */
+  memorizedJuzSources?: Record<string, JuzSource>;
 }
+
+/**
+ * مصدر الجزء المحفوظ:
+ *  prior  = محفوظ قبل الالتحاق بالمشروع (تُدخله الإدارة)
+ *  manual = أُتمّ في المشروع وحدّده المشرف يدويًا
+ *  auto   = أُتمّ في المشروع واكتشفه النظام من سجل التسميع المعتمد (كل صفحات الجزء مسمّعة ومعتمدة)
+ */
+export type JuzSource = 'prior' | 'manual' | 'auto';
 
 /**
  * المطلوب/المنجز عدد صفحات فعلي، ونسبة الإنجاز تُحسب منهما تلقائيًا (منجز÷مطلوب×100) —
@@ -87,6 +97,11 @@ export interface MemorizationEntry {
   completedPages: number; // عدد صفحات الحفظ المسمَّعة فعليًا
   completion: number; // نسبة الإنجاز % = completedPages ÷ requiredPages × 100 (محسوبة، غير مُدخلة يدويًا)
   grade: number; // جودة التسميع /100 (مستقلة عن نسبة الإنجاز)
+  /**
+   * اعتماد التسميع: false = سمّع الطالب لكن التسميع لم يُعتمد (يحتاج إعادة) فلا يُحسب منجزًا (الإنجاز 0).
+   * غير موجود (سجلات ما قبل هذه الميزة) = معتمد.
+   */
+  approved?: boolean;
   notes?: string;
 }
 
@@ -97,6 +112,7 @@ export interface RevisionEntry {
   completedPages: number;
   completion: number;
   grade: number;
+  approved?: boolean;
   notes?: string;
 }
 
@@ -173,4 +189,102 @@ export interface HonorBoard {
   published: boolean;
   entries: HonorBoardEntry[];
   createdAt: string;
+}
+
+/* ------------------------------------------------------------------
+ *  المطلوبات المرنة (تجويد، حفظ حديث، درس، واجب…) — جدول assignments
+ * ------------------------------------------------------------------ */
+
+/** نوع المطلوب: الحفظ بالصفحات يدخل بحساب الأجزاء المحفوظة تلقائيًا */
+export type AssignmentCategory = 'memorization' | 'revision' | 'other';
+
+/** وحدة قياس المقدار المطلوب */
+export type AssignmentUnit = 'page' | 'ayah' | 'hadith' | 'item';
+
+/** الحالة المخزّنة لكل طالب (المتأخر لا يُخزَّن: يُشتق من تاريخ الاستحقاق) */
+export type AssignmentStoredStatus = 'not_started' | 'in_progress' | 'completed';
+export type AssignmentStatus = AssignmentStoredStatus | 'overdue';
+
+export interface AssignmentTarget {
+  studentId: string;
+  /** للمطلوب بلا مقدار: تحددها الإدارة يدويًا. للمطلوب بمقدار: تُحسب من سجل الإنجاز وتُحفظ للإشعارات */
+  status: AssignmentStoredStatus;
+}
+
+/**
+ * تسميع/إنجاز على مطلوب: نطاق (من–إلى) إذا كان المطلوب نطاقًا، أو مقدار إذا كان المطلوب عددًا.
+ * approved = false: سمّع ولم يُعتمد بعد — لا يُحسب منجزًا.
+ */
+export interface AssignmentProgress {
+  id: string;
+  assignmentId: string;
+  studentId: string;
+  date: string;
+  rangeFrom?: number;
+  rangeTo?: number;
+  amount?: number;
+  approved: boolean;
+  note?: string;
+}
+
+export interface Assignment {
+  id: string;
+  title: string;
+  description: string;
+  category: AssignmentCategory;
+  dueDate?: string; // YYYY-MM-DD — اختياري
+  visibleToParents: boolean;
+  /** بلا وحدة = مطلوب بلا مقدار (لا تُولَّد له نسبة) */
+  unit?: AssignmentUnit;
+  /** المطلوب نطاق: من الآية/الصفحة rangeFrom إلى rangeTo (شاملتان) */
+  rangeFrom?: number;
+  rangeTo?: number;
+  /** أو المطلوب عدد فقط (مثلًا 3 أحاديث) */
+  targetAmount?: number;
+  createdAt: string;
+  updatedAt: string;
+  targets: AssignmentTarget[];
+  progress: AssignmentProgress[];
+}
+
+/* ------------------------------------------------------------------
+ *  الإشعارات
+ * ------------------------------------------------------------------ */
+
+export interface AppNotification {
+  id: string;
+  title: string;
+  body: string;
+  link?: string;
+  kind: 'manual' | 'auto';
+  sendAt: string; // ISO
+  readAt?: string | null; // لإشعارات المستخدم الحالي فقط
+}
+
+/** إشعار مرسل من الإدارة (للسجل) مع عدد المستلمين ومن قرأه */
+export interface SentNotification extends AppNotification {
+  recipients: number;
+  read: number;
+  ruleId?: string;
+}
+
+export type NotificationRuleType = 'session_reminder' | 'assignment_new' | 'assignment_due' | 'assignment_overdue' | 'recitation_shortfall';
+
+export interface NotificationRule {
+  id: string;
+  type: NotificationRuleType;
+  name: string;
+  enabled: boolean;
+  titleTemplate: string;
+  bodyTemplate: string;
+  /** المجموعات المستهدفة — فارغة = كل أولياء الأمور */
+  audience: string[];
+  /** أيام الدوام (0 = الأحد … 6 = السبت) — لتذكير الدوام */
+  weekdays: number[];
+  /** ساعة الدوام (HH:MM) — تظهر بالرسالة */
+  sessionTime?: string;
+  /** ساعة الإرسال (HH:MM) بتوقيت المركز */
+  sendTime?: string;
+  /** قبل الاستحقاق بكم ساعة — لقرب موعد الاستحقاق */
+  hoursBefore?: number;
 }

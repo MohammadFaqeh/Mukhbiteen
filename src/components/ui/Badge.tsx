@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import type { AttendanceStatus, CommitmentLevel, CompletionStatus } from '@/types';
 import { attendanceLabels, commitmentLabels, cx } from '@/utils/format';
-import { completionStatusLabels, completionStatusTone } from '@/utils/quran';
+import { completionStatus, completionStatusLabels, completionStatusTone, hasMeasure, isApproved } from '@/utils/quran';
 
 type Tone = 'navy' | 'burgundy' | 'green' | 'amber' | 'gray' | 'gold';
 const tones: Record<Tone, string> = {
@@ -46,4 +46,24 @@ export function CompletionBadge({ status, className }: { status: CompletionStatu
       {completionStatusLabels[status]}
     </Badge>
   );
+}
+
+/**
+ * حالة جزء (حفظ/مراجعة) بيوم دوام: سُمّع ولم يُعتمد / بلا عدد صفحات محدد (لا نسبة مضللة) / أتمّ / جزئي / لم يُنجز
+ */
+export function PartStatusBadge({ part, className }: { part?: { requiredPages: number; completedPages: number; completion: number; approved?: boolean } | null; className?: string }) {
+  if (!part) return null;
+  if (!isApproved(part) && part.completedPages > 0)
+    return (
+      <Badge tone="amber" className={className}>
+        سُمّع ولم يُعتمد بعد
+      </Badge>
+    );
+  if (!hasMeasure(part))
+    return (
+      <Badge tone="gray" className={className}>
+        لم يُحدَّد عدد صفحات مطلوب
+      </Badge>
+    );
+  return <CompletionBadge status={completionStatus(part.completion)} className={className} />;
 }

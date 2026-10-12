@@ -3,7 +3,8 @@ import { BookOpen, Medal, RotateCcw } from 'lucide-react';
 import type { SessionRecord } from '@/types';
 import type { StudentStats } from '@/utils/stats';
 import { ProgressBar } from '@/components/ui/Progress';
-import { CommitmentBadge } from '@/components/ui/Badge';
+import { CommitmentBadge, PartStatusBadge } from '@/components/ui/Badge';
+import { hasMeasure } from '@/utils/quran';
 import { commitmentLabels, formatNumericDate } from '@/utils/format';
 
 function Row({ label, value }: { label: string; value: ReactNode }) {
@@ -29,13 +30,16 @@ export function MemorizationCard({ last }: { last?: SessionRecord }) {
         <>
           <p className="text-[12px] text-navy-400">آخر حفظ مطلوب</p>
           <p className="text-[16px] font-bold text-navy-900">{m.required}</p>
-          <div className="mt-3">
-            <div className="mb-1 flex justify-between text-[12px]">
-              <span className="text-navy-400">نسبة الإنجاز</span>
-              <b className="text-navy-800">{m.completion}%</b>
+          {hasMeasure(m) && (
+            <div className="mt-3">
+              <div className="mb-1 flex justify-between text-[12px]">
+                <span className="text-navy-400">نسبة الإنجاز</span>
+                <b className="text-navy-800">{m.completion}/100</b>
+              </div>
+              <ProgressBar value={m.completion} />
             </div>
-            <ProgressBar value={m.completion} />
-          </div>
+          )}
+          <PartStatusBadge part={m} className="mt-2 self-start" />
           <div className="mt-2">
             <Row label="تقييم التسميع" value={`${m.grade}/100`} />
             <Row label="تم التسميع" value={m.recited} />
@@ -64,13 +68,16 @@ export function RevisionCard({ sessions }: { sessions: SessionRecord[] }) {
         <>
           <p className="text-[12px] text-navy-400">المراجعة المطلوبة</p>
           <p className="text-[16px] font-bold text-navy-900">{r.required}</p>
-          <div className="mt-3">
-            <div className="mb-1 flex justify-between text-[12px]">
-              <span className="text-navy-400">الإنجاز</span>
-              <b className="text-navy-800">{r.completion}%</b>
+          {hasMeasure(r) && (
+            <div className="mt-3">
+              <div className="mb-1 flex justify-between text-[12px]">
+                <span className="text-navy-400">الإنجاز</span>
+                <b className="text-navy-800">{r.completion}/100</b>
+              </div>
+              <ProgressBar value={r.completion} tone="burgundy" />
             </div>
-            <ProgressBar value={r.completion} tone="burgundy" />
-          </div>
+          )}
+          <PartStatusBadge part={r} className="mt-2 self-start" />
           <div className="mt-2">
             <Row label="التقييم" value={`${r.grade}/100`} />
             <Row label="ما تمت مراجعته" value={r.revised} />

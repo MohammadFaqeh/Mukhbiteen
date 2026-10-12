@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { supervisor } from '@/data/project';
 
 interface Session {
+  id: string; // معرّف المستخدم في Supabase Auth (للإشعارات)
   role: Role;
   displayName: string;
   studentId?: string;
@@ -26,7 +27,7 @@ const AuthContext = createContext<AuthValue | null>(null);
 function sameIdentity(a: Session | null, b: Session | null): boolean {
   if (a === b) return true;
   if (!a || !b) return false;
-  return a.role === b.role && a.studentId === b.studentId && a.email === b.email && a.displayName === b.displayName;
+  return a.id === b.id && a.role === b.role && a.studentId === b.studentId && a.email === b.email && a.displayName === b.displayName;
 }
 
 async function loadProfile(userId: string, email: string): Promise<Session | null> {
@@ -35,7 +36,7 @@ async function loadProfile(userId: string, email: string): Promise<Session | nul
   const hasRealName = data.display_name && data.display_name !== email;
   const student = data.students as { guardian_name?: string } | null;
   const displayName = hasRealName ? data.display_name! : data.role === 'admin' ? supervisor.name : student?.guardian_name || email;
-  return { role: data.role, studentId: data.student_id ?? undefined, displayName, email };
+  return { id: userId, role: data.role, studentId: data.student_id ?? undefined, displayName, email };
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {

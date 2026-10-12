@@ -37,16 +37,17 @@ export function isAssigned(p: { required?: string; requiredPages?: number; compl
 
 /**
  * أرقام الصفحات المسمّعة بصيغة مرنة: "415-416" أو "415 - 416" أو "415 إلى 416" أو "12, 15-16" أو أرقام عربية.
- * يرجع النص بصيغة موحّدة وعدد الصفحات، أو null إذا النص مش أرقام صفحات.
+ * يرجع النص بصيغة موحّدة وعدد الصفحات وقائمة الصفحات نفسها، أو null إذا النص مش أرقام صفحات.
+ * الصفحة المكررة بأكثر من مقطع ("1-5، 3-6") تُحسب مرة واحدة فقط.
  */
-export function parsePageRanges(raw: string): { text: string; pages: number } | null {
+export function parsePageRanges(raw: string): { text: string; pages: number; list: number[] } | null {
   const s = raw
     .replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
     .replace(/\s*(?:إلى|الى|لـ|ل|to|[-–—ـ~])\s*/gi, '-')
     .trim();
   if (!s) return null;
   const parts = s.split(/\s*[,،;+&]\s*|\s+و?\s*/).filter(Boolean);
-  let pages = 0;
+  const set = new Set<number>();
   const out: string[] = [];
   for (const p of parts) {
     const m = p.match(/^(\d{1,3})(?:-(\d{1,3}))?$/);
@@ -54,19 +55,46 @@ export function parsePageRanges(raw: string): { text: string; pages: number } | 
     const a = +m[1];
     const b = m[2] ? +m[2] : a;
     if (a < 1 || b < a || b > 604) return null;
-    pages += b - a + 1;
+    for (let i = a; i <= b; i++) set.add(i);
     out.push(b === a ? `${a}` : `${a}-${b}`);
   }
-  return { text: out.join('، '), pages };
+  return { text: out.join('، '), pages: set.size, list: [...set].sort((x, y) => x - y) };
 }
 
+/** التسميع معتمد؟ السجلات القديمة (بلا حقل اعتماد) تُعتبر معتمدة */
+export const isApproved = (p: { approved?: boolean } | null | undefined) => p?.approved !== false;
+
 /**
- * تقصير جزء (حفظ/مراجعة) عن عدد الصفحات المطلوبة: null إذا أتمّ المطلوب أو لم يُحدَّد عدد صفحات.
+ * المصدر الموحّد لنسبة إنجاز الحفظ/المراجعة بيوم دوام (من 100):
+ *   المنجز المعتمد ÷ المطلوب × 100 — والتسميع غير المعتمد لا يُحسب منجزًا (0).
+ * كل الموقع يقرأ e.completion، وهي تُعاد حسابها من هنا عند القراءة من قاعدة البيانات وعند الحفظ،
+ * فلا يوجد مكان ثاني يحسبها بمنطق مختلف.
+ */
+export function entryCompletion(p: { requiredPages: number; completedPages: number; approved?: boolean }): number {
+  return isApproved(p) ? completionPercent(p.requiredPages, p.completedPages) : 0;
+}
+
+/** هل للجزء مقدار محدد (عدد صفحات مطلوبة)؟ بدونه لا نعرض نسبة إنجاز قد تكون مضللة */
+export const hasMeasure = (p: { requiredPages?: number } | null | undefined) => (p?.requiredPages ?? 0) > 0;
+
+/**
+ * تقصير جزء (حفظ/مراجعة) عن عدد الصفحات المطلوبة: null إذا أتمّ المطلوب (معتمدًا) أو لم يُحدَّد عدد صفحات.
+ * pending = سمّع صفحات لكن التسميع لم يُعتمد بعد — يُميَّز عن "لم يسمّع".
  * يُستخدم لإبراز التقصير لولي الأمر (سمّع كذا من أصل كذا).
  */
-export function pageShortfall(p: { requiredPages?: number; completedPages?: number } | null | undefined) {
+export function pageShortfall(p: { requiredPages?: number; completedPages?: number; approved?: boolean } | null | undefined) {
   const required = p?.requiredPages ?? 0;
-  const done = p?.completedPages ?? 0;
+  const recited = p?.completedPages ?? 0;
+  const done = isApproved(p) ? recited : 0;
   if (required <= 0 || done >= required) return null;
-  return { required, done, missing: required - done, none: done <= 0 };
+  return { required, done, missing: required - done, none: done <= 0, pending: !isApproved(p) && recited > 0 ? recited : 0 };
+}
+
+/* ---------------- الأجزاء (مصحف المدينة، 604 صفحات) ---------------- */
+
+/** صفحات الجزء: الأول 1–21، والأجزاء 2–29 كل جزء 20 صفحة، والثلاثون 582–604 */
+export function juzPages(n: number): [from: number, to: number] {
+  const from = n === 1 ? 1 : 20 * (n - 1) + 2;
+  const to = n === 30 ? 604 : 20 * n + 1;
+  return [from, to];
 }

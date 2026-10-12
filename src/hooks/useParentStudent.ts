@@ -6,7 +6,7 @@ import { studentSessions, studentStats } from '@/utils/stats';
 /** يعيد الطالب المرتبط بحساب ولي الأمر الحالي مع سجلاته وإحصائياته */
 export function useParentStudent() {
   const { user } = useAuth();
-  const { students, sessions, dailyWorship, getRequirement, activities } = useData();
+  const { students, sessions, dailyWorship, getRequirement, activities, assignments } = useData();
   const id = user?.studentId ?? students[0]?.id;
   return useMemo(() => {
     const student = students.find((s) => s.id === id);
@@ -17,6 +17,7 @@ export function useParentStudent() {
       stats: id ? studentStats(sessions, dailyWorship, id) : undefined,
       requirement: id ? getRequirement(id) : undefined,
       activities,
+      assignments: id ? assignments.filter((a) => a.visibleToParents && a.targets.some((t) => t.studentId === id)) : [],
     };
-  }, [id, students, sessions, dailyWorship, getRequirement, activities]);
+  }, [id, students, sessions, dailyWorship, getRequirement, activities, assignments]);
 }

@@ -2,8 +2,20 @@
  * تحويل بين أعمدة قاعدة البيانات (snake_case) وأنواع التطبيق (camelCase).
  * الحقول المتداخلة (memorization, revision, prayers) تُخزَّن كما هي (jsonb) بلا تحويل إضافي.
  */
-import type { Activity, ActivityImage, DailyWorship, HonorBoard, NextRequirement, SessionRecord, Student, TajweedMaterial } from '@/types';
-import { isAssigned } from '@/utils/quran';
+import type {
+  Activity,
+  ActivityImage,
+  Assignment,
+  AssignmentProgress,
+  DailyWorship,
+  HonorBoard,
+  NextRequirement,
+  NotificationRule,
+  SessionRecord,
+  Student,
+  TajweedMaterial,
+} from '@/types';
+import { entryCompletion, isAssigned } from '@/utils/quran';
 
 export function studentFromRow(r: any): Student {
   return {
@@ -22,6 +34,7 @@ export function studentFromRow(r: any): Student {
     tajweedCurrent: r.tajweed_current ?? undefined,
     memorizedJuz: Array.isArray(r.memorized_juz) ? r.memorized_juz.map(Number) : [],
     memorizedJuzDates: r.memorized_juz_dates && typeof r.memorized_juz_dates === 'object' ? r.memorized_juz_dates : {},
+    memorizedJuzSources: r.memorized_juz_sources && typeof r.memorized_juz_sources === 'object' ? r.memorized_juz_sources : {},
   };
 }
 
@@ -42,7 +55,14 @@ export function studentToRow(s: Partial<Student>) {
   if (s.tajweedCurrent !== undefined) row.tajweed_current = s.tajweedCurrent || null;
   if (s.memorizedJuz !== undefined) row.memorized_juz = s.memorizedJuz;
   if (s.memorizedJuzDates !== undefined) row.memorized_juz_dates = s.memorizedJuzDates;
+  if (s.memorizedJuzSources !== undefined) row.memorized_juz_sources = s.memorizedJuzSources;
   return row;
+}
+
+/** نسبة الإنجاز تُعاد حسابها دائمًا من المصدر الموحّد (entryCompletion) بدل الثقة بالرقم المخزّن */
+function withCompletion<T extends { requiredPages: number; completedPages: number; approved?: boolean; completion: number }>(e: T): T {
+  const p = { ...e, requiredPages: Number(e.requiredPages) || 0, completedPages: Number(e.completedPages) || 0 };
+  return { ...p, completion: entryCompletion(p) };
 }
 
 export function sessionFromRow(r: any): SessionRecord {
@@ -54,8 +74,8 @@ export function sessionFromRow(r: any): SessionRecord {
     commitment: r.commitment ?? undefined,
     score: r.score ?? undefined,
     // جزء بمطلوب 0 ومسمّع 0 (سجلات قديمة) = غير مطلوب من الطالب، فلا يظهر ولا يُحسب
-    memorization: isAssigned(r.memorization) ? r.memorization : null,
-    revision: isAssigned(r.revision) ? r.revision : null,
+    memorization: isAssigned(r.memorization) ? withCompletion(r.memorization) : null,
+    revision: isAssigned(r.revision) ? withCompletion(r.revision) : null,
     notes: r.notes ?? undefined,
   };
 }
@@ -210,4 +230,103 @@ export function tajweedMaterialFromRow(r: any): TajweedMaterial {
 
 export function tajweedMaterialToRow(m: TajweedMaterial) {
   return { course: m.course, pdf_url: m.pdfUrl ?? null, file_name: m.fileName ?? null, updated_at: m.updatedAt ?? new Date().toISOString() };
+}
+
+export function assignmentFromRow(r: any): Assignment {
+  const num = (v: unknown) => (v === null || v === undefined || v === '' ? undefined : Number(v));
+  return {
+    id: r.id,
+    title: r.title,
+    description: r.description ?? '',
+    category: r.category ?? 'other',
+    dueDate: r.due_date ?? undefined,
+    visibleToParents: r.visible_to_parents ?? true,
+    unit: r.unit ?? undefined,
+    rangeFrom: num(r.range_from),
+    rangeTo: num(r.range_to),
+    targetAmount: num(r.target_amount),
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+    targets: (r.assignment_students ?? []).map((t: any) => ({ studentId: t.student_id, status: t.status ?? 'not_started' })),
+    progress: (r.assignment_progress ?? [])
+      .map(
+        (p: any): AssignmentProgress => ({
+          id: p.id,
+          assignmentId: p.assignment_id,
+          studentId: p.student_id,
+          date: p.date,
+          rangeFrom: num(p.range_from),
+          rangeTo: num(p.range_to),
+          amount: num(p.amount),
+          approved: p.approved ?? true,
+          note: p.note ?? undefined,
+        }),
+      )
+      .sort((a: AssignmentProgress, b: AssignmentProgress) => b.date.localeCompare(a.date)),
+  };
+}
+
+/** صف جدول assignments (بدون الطلاب وسجل الإنجاز — لهم جداولهم) */
+export function assignmentToRow(a: Assignment) {
+  return {
+    id: a.id,
+    title: a.title,
+    description: a.description || null,
+    category: a.category,
+    due_date: a.dueDate || null,
+    visible_to_parents: a.visibleToParents,
+    unit: a.unit ?? null,
+    range_from: a.rangeFrom ?? null,
+    range_to: a.rangeTo ?? null,
+    target_amount: a.targetAmount ?? null,
+  };
+}
+
+export function progressToRow(p: AssignmentProgress) {
+  return {
+    id: p.id,
+    assignment_id: p.assignmentId,
+    student_id: p.studentId,
+    date: p.date,
+    range_from: p.rangeFrom ?? null,
+    range_to: p.rangeTo ?? null,
+    amount: p.amount ?? null,
+    approved: p.approved,
+    note: p.note || null,
+  };
+}
+
+const hhmm = (t: unknown) => (typeof t === 'string' && t ? t.slice(0, 5) : undefined);
+
+export function notificationRuleFromRow(r: any): NotificationRule {
+  return {
+    id: r.id,
+    type: r.type,
+    name: r.name,
+    enabled: r.enabled,
+    titleTemplate: r.title_template,
+    bodyTemplate: r.body_template,
+    audience: r.audience ?? [],
+    weekdays: r.weekdays ?? [],
+    sessionTime: hhmm(r.session_time),
+    sendTime: hhmm(r.send_time),
+    hoursBefore: r.hours_before ?? undefined,
+  };
+}
+
+export function notificationRuleToRow(r: NotificationRule) {
+  return {
+    id: r.id,
+    type: r.type,
+    name: r.name,
+    enabled: r.enabled,
+    title_template: r.titleTemplate,
+    body_template: r.bodyTemplate,
+    audience: r.audience,
+    weekdays: r.weekdays,
+    session_time: r.sessionTime || null,
+    send_time: r.sendTime || null,
+    hours_before: r.hoursBefore ?? null,
+    updated_at: new Date().toISOString(),
+  };
 }

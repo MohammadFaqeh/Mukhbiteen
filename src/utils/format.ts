@@ -46,7 +46,22 @@ export function remainingLabel(days: number) {
   return `متبقي ${days} يومًا على الدوام`;
 }
 
-export const pct = (n: number, digits = 1) => `${Number.isInteger(n) ? n : n.toFixed(digits)}%`;
+/** منذ 5 دقائق / منذ 3 ساعات / منذ يومين — لأوقات الإشعارات */
+export function timeAgo(iso: string, now = Date.now()) {
+  const min = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60_000));
+  if (min < 1) return 'الآن';
+  if (min === 1) return 'منذ دقيقة';
+  if (min === 2) return 'منذ دقيقتين';
+  if (min < 60) return min <= 10 ? `منذ ${min} دقائق` : `منذ ${min} دقيقة`;
+  const h = Math.round(min / 60);
+  if (h === 1) return 'منذ ساعة';
+  if (h === 2) return 'منذ ساعتين';
+  if (h < 24) return h <= 10 ? `منذ ${h} ساعات` : `منذ ${h} ساعة`;
+  const d = Math.round(h / 24);
+  return d === 1 ? 'منذ يوم' : d === 2 ? 'منذ يومين' : `منذ ${d} أيام`;
+}
+
+export const pct =(n: number, digits = 1) => `${Number.isInteger(n) ? n : n.toFixed(digits)}%`;
 export const round1 = (n: number) => Math.round(n * 10) / 10;
 
 export const attendanceLabels: Record<AttendanceStatus, string> = {

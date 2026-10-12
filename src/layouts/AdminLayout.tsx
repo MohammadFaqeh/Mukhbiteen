@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import ErrorBoundary from '@/components/shared/ErrorBoundary';
-import StudentQuickFind from '@/components/admin/StudentQuickFind';
-import { CalendarPlus, FileSpreadsheet, FileText, GalleryHorizontalEnd, LayoutDashboard, ScrollText, Users } from 'lucide-react';
+import GlobalSearch from '@/components/shared/GlobalSearch';
+import NotificationBell from '@/components/shared/NotificationBell';
+import { CalendarPlus, FileSpreadsheet, FileText, GalleryHorizontalEnd, LayoutDashboard, ListChecks, ScrollText, Users } from 'lucide-react';
 import Sidebar, { type NavItem } from './Sidebar';
 import BrandBackground from '@/components/brand/BrandBackground';
 import Footer from '@/components/brand/Footer';
@@ -19,6 +20,7 @@ const items: NavItem[] = [
   { to: '/admin/students', label: 'إدارة الطلاب', icon: Users },
   { to: '/admin/attendance', label: 'تسجيل دوام اليوم', icon: CalendarPlus },
   { to: '/admin/import', label: 'استيراد سجل التسميع', icon: FileSpreadsheet },
+  { to: '/admin/assignments', label: 'المطلوبات', icon: ListChecks },
   { to: '/admin/tajweed', label: 'التجويد', icon: ScrollText },
   { to: '/admin/activities', label: 'الصور والأنشطة', icon: GalleryHorizontalEnd },
   { to: '/admin/reports', label: 'التقارير', icon: FileText },
@@ -60,8 +62,9 @@ export default function AdminLayout() {
                 </p>
               </div>
             </div>
-            <StudentQuickFind />
+            <GlobalSearch className="order-last w-full flex-none sm:order-none sm:max-w-sm sm:flex-1" />
             <div className="flex items-center gap-3">
+              <NotificationBell />
               <div className="text-left leading-tight">
                 <p className="text-[13px] font-bold text-navy-800">{user?.displayName}</p>
                 <p className="text-[11px] text-navy-400">مشرف المشروع</p>

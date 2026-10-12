@@ -14,7 +14,7 @@ import type { AttendanceStatus, CommitmentLevel, DailyWorship, SessionRecord, St
 import { TODAY } from '@/utils/today';
 import { suggestScore } from '@/utils/stats';
 import { weekDates, weekStartOf, weekWorshipScore } from '@/utils/worship';
-import { completionPercent, isAssigned, parsePageRanges } from '@/utils/quran';
+import { entryCompletion, isAssigned, parsePageRanges } from '@/utils/quran';
 import { cx, formatLongDate, pct } from '@/utils/format';
 
 interface Row {
@@ -27,11 +27,13 @@ interface Row {
   memRequiredPages: number;
   memCompletedPages: number;
   memRecited?: string;
+  memApproved?: boolean; // التسميع معتمد (الافتراضي نعم)
   hasRev: boolean;
   revGrade?: number;
   revRequiredPages: number;
   revCompletedPages: number;
   revRevised?: string;
+  revApproved?: boolean;
   notes: string;
   showNotes: boolean;
   showDetails?: boolean; // سطر وصف ما سُمّع حفظًا ومراجعةً
@@ -42,8 +44,10 @@ interface Row {
  * required = المطلوب المكتوب للطالب (المطلوب القادم المحفوظ) — يخلّي الجزء مطلوبًا حتى لو ما سمّع شيء.
  */
 function partsOf(x: Row, req?: { memorization?: string; revision?: string }) {
-  const mem = { required: req?.memorization ?? '', recited: x.memRecited ?? '', requiredPages: x.memRequiredPages, completedPages: x.memCompletedPages, completion: completionPercent(x.memRequiredPages, x.memCompletedPages), grade: x.memGrade ?? 0 };
-  const rev = { required: req?.revision ?? '', revised: x.revRevised ?? '', requiredPages: x.revRequiredPages, completedPages: x.revCompletedPages, completion: completionPercent(x.revRequiredPages, x.revCompletedPages), grade: x.revGrade ?? 0 };
+  const memBase = { required: req?.memorization ?? '', recited: x.memRecited ?? '', requiredPages: x.memRequiredPages, completedPages: x.memCompletedPages, grade: x.memGrade ?? 0, approved: x.memApproved !== false };
+  const revBase = { required: req?.revision ?? '', revised: x.revRevised ?? '', requiredPages: x.revRequiredPages, completedPages: x.revCompletedPages, grade: x.revGrade ?? 0, approved: x.revApproved !== false };
+  const mem = { ...memBase, completion: entryCompletion(memBase) };
+  const rev = { ...revBase, completion: entryCompletion(revBase) };
   return { mem: x.hasMem && isAssigned(mem) ? mem : null, rev: x.hasRev && isAssigned(rev) ? rev : null };
 }
 
@@ -98,14 +102,16 @@ function rowsFromSaved(students: Student[], sessions: SessionRecord[], date: str
       memRequiredPages: ex?.memorization?.requiredPages ?? 0,
       memCompletedPages: ex?.memorization?.completedPages ?? 0,
       memRecited: ex?.memorization?.recited,
+      memApproved: ex?.memorization?.approved !== false,
       hasRev: ex ? !!ex.revision : true,
       revGrade: ex?.revision?.grade ?? 90,
       revRequiredPages: ex?.revision?.requiredPages ?? 0,
       revCompletedPages: ex?.revision?.completedPages ?? 0,
       revRevised: ex?.revision?.revised,
+      revApproved: ex?.revision?.approved !== false,
       notes: ex?.notes ?? '',
       showNotes: !!ex?.notes,
-      showDetails: !!(ex?.memorization?.recited || ex?.revision?.revised),
+      showDetails: !!(ex?.memorization?.recited || ex?.revision?.revised || ex?.memorization?.approved === false || ex?.revision?.approved === false),
     };
   });
 }
@@ -365,7 +371,7 @@ export default function AdminAttendance() {
                       <NumberInput small value={r.hasMem ? r.memGrade : undefined} onChange={(v) => patch(r.studentId, { memGrade: v })} ariaLabel="علامة الحفظ" placeholder="علامة" />
                       <NumberInput small max={999} value={r.hasMem ? r.memRequiredPages : undefined} onChange={(v) => patch(r.studentId, { memRequiredPages: v ?? 0 })} ariaLabel="صفحات الحفظ المطلوبة" placeholder="مطلوب" />
                       <NumberInput small max={999} value={r.hasMem ? r.memCompletedPages : undefined} onChange={(v) => patch(r.studentId, { memCompletedPages: v ?? 0 })} ariaLabel="صفحات الحفظ المنجزة" placeholder="منجز" />
-                      {r.hasMem && <span className="w-9 shrink-0 text-[11px] font-bold text-navy-500">{pct(completionPercent(r.memRequiredPages, r.memCompletedPages), 0)}</span>}
+                      {r.hasMem && <span className="w-9 shrink-0 text-[11px] font-bold text-navy-500">{pct(entryCompletion({ requiredPages: r.memRequiredPages, completedPages: r.memCompletedPages, approved: r.memApproved }), 0)}</span>}
                     </div>
                   </Cell>
                   <Cell label="المراجعة (علامة / مطلوب / منجز)" className={cx(!attended && 'pointer-events-none opacity-40')}>
@@ -376,7 +382,7 @@ export default function AdminAttendance() {
                       <NumberInput small value={r.hasRev ? r.revGrade : undefined} onChange={(v) => patch(r.studentId, { revGrade: v })} ariaLabel="علامة المراجعة" placeholder="علامة" />
                       <NumberInput small max={999} value={r.hasRev ? r.revRequiredPages : undefined} onChange={(v) => patch(r.studentId, { revRequiredPages: v ?? 0 })} ariaLabel="صفحات المراجعة المطلوبة" placeholder="مطلوب" />
                       <NumberInput small max={999} value={r.hasRev ? r.revCompletedPages : undefined} onChange={(v) => patch(r.studentId, { revCompletedPages: v ?? 0 })} ariaLabel="صفحات المراجعة المنجزة" placeholder="منجز" />
-                      {r.hasRev && <span className="w-9 shrink-0 text-[11px] font-bold text-navy-500">{pct(completionPercent(r.revRequiredPages, r.revCompletedPages), 0)}</span>}
+                      {r.hasRev && <span className="w-9 shrink-0 text-[11px] font-bold text-navy-500">{pct(entryCompletion({ requiredPages: r.revRequiredPages, completedPages: r.revCompletedPages, approved: r.revApproved }), 0)}</span>}
                     </div>
                   </Cell>
                   <Cell label="علامة أسبوع العبادات" className={cx(!attended && 'pointer-events-none opacity-40')}>
@@ -401,10 +407,10 @@ export default function AdminAttendance() {
                   <div className="mt-2 grid animate-fade-in gap-2 md:grid-cols-2">
                     {(
                       [
-                        { on: r.hasMem, icon: BookOpen, tone: 'bg-navy-700', label: 'الحفظ', req: getRequirement(r.studentId)?.memorization, value: r.memRecited, set: (v: string) => patch(r.studentId, { memRecited: v }), fix: () => fixPages(r, 'mem') },
-                        { on: r.hasRev, icon: RotateCcw, tone: 'bg-burgundy-600', label: 'المراجعة', req: getRequirement(r.studentId)?.revision, value: r.revRevised, set: (v: string) => patch(r.studentId, { revRevised: v }), fix: () => fixPages(r, 'rev') },
+                        { on: r.hasMem, icon: BookOpen, tone: 'bg-navy-700', label: 'الحفظ', req: getRequirement(r.studentId)?.memorization, value: r.memRecited, set: (v: string) => patch(r.studentId, { memRecited: v }), fix: () => fixPages(r, 'mem'), approved: r.memApproved !== false, setApproved: (v: boolean) => patch(r.studentId, { memApproved: v }) },
+                        { on: r.hasRev, icon: RotateCcw, tone: 'bg-burgundy-600', label: 'المراجعة', req: getRequirement(r.studentId)?.revision, value: r.revRevised, set: (v: string) => patch(r.studentId, { revRevised: v }), fix: () => fixPages(r, 'rev'), approved: r.revApproved !== false, setApproved: (v: boolean) => patch(r.studentId, { revApproved: v }) },
                       ] as const
-                    ).map(({ on, icon: Icon, tone, label, req, value, set, fix }) => (
+                    ).map(({ on, icon: Icon, tone, label, req, value, set, fix, approved, setApproved }) => (
                       <div key={label} className={cx('flex items-center gap-2', !on && 'pointer-events-none opacity-40')}>
                         <span className={cx('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white', tone)} title={label}>
                           <Icon className="h-4 w-4" />
@@ -419,6 +425,15 @@ export default function AdminAttendance() {
                           aria-label={`وصف ${label} المسمّع`}
                         />
                         {on && req && <span className="hidden max-w-[40%] shrink-0 truncate text-[11px] text-navy-400 lg:inline">المطلوب: {req}</span>}
+                        <button
+                          type="button"
+                          onClick={() => setApproved(!approved)}
+                          aria-pressed={approved}
+                          title="التسميع غير المعتمد لا يُحسب منجزًا، ويظهر لولي الأمر أنه سُمّع ولم يُعتمد"
+                          className={cx('shrink-0 rounded-lg px-2 py-1 text-[11px] font-bold ring-1 ring-inset transition', approved ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-amber-50 text-amber-700 ring-amber-200')}
+                        >
+                          {approved ? 'معتمد' : 'غير معتمد'}
+                        </button>
                       </div>
                     ))}
                   </div>
