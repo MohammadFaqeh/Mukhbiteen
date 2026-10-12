@@ -66,6 +66,7 @@ const PARENT_PAGES: [string, string, string?][] = [
   ['التجويد', '/parent/tajweed', 'دورة احكام'],
   ['سجل الدوام', '/parent/sessions', 'حضور غياب'],
   ['التقارير', '/parent/reports', 'تقرير pdf'],
+  ['عن الموقع', '/parent/about', 'ماذا يقدم الموقع شرح معلومات المنصة دليل'],
 ];
 
 export function buildSearchIndex(input: {

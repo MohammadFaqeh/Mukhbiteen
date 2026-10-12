@@ -11,6 +11,7 @@ import ParentQuran from './pages/parent/ParentQuran';
 import ParentWorship from './pages/parent/ParentWorship';
 import ParentSessions from './pages/parent/ParentSessions';
 import ParentReports from './pages/parent/ParentReports';
+import ParentAbout from './pages/parent/ParentAbout';
 import ParentTajweed from './pages/parent/ParentTajweed';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminStudents from './pages/admin/AdminStudents';
@@ -52,6 +53,7 @@ export default function App() {
         <Route path="tajweed" element={<ParentTajweed />} />
         <Route path="sessions" element={<ParentSessions />} />
         <Route path="reports" element={<ParentReports />} />
+        <Route path="about" element={<ParentAbout />} />
       </Route>
 
       <Route path="/admin" element={<RequireRole role="admin"><AdminLayout /></RequireRole>}>

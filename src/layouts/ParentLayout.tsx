@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import ErrorBoundary from '@/components/shared/ErrorBoundary';
-import { BookOpenText, CalendarCheck2, CalendarClock, FileText, HandHeart, House, ScrollText } from 'lucide-react';
+import { BookOpenText, CalendarCheck2, CalendarClock, FileText, HandHeart, House, Info, ScrollText } from 'lucide-react';
 import Sidebar, { type NavItem } from './Sidebar';
 import BrandBackground from '@/components/brand/BrandBackground';
 import Footer from '@/components/brand/Footer';
@@ -23,6 +23,7 @@ const items: NavItem[] = [
   { to: '/parent/tajweed', label: 'التجويد', icon: ScrollText },
   { to: '/parent/sessions', label: 'سجل الدوام', icon: CalendarCheck2 },
   { to: '/parent/reports', label: 'التقارير', icon: FileText },
+  { to: '/parent/about', label: 'عن الموقع', icon: Info },
 ];
 
 export default function ParentLayout() {
