@@ -179,7 +179,7 @@ export default function JuzMap({ student, editable }: { student: Student; editab
   };
 
   return (
-    <section className={cx('card p-5', hafiz && 'ring-1 ring-gold-300')}>
+    <section className={cx('card w-full p-4 sm:p-5', !editable && 'mx-auto max-w-3xl', hafiz && 'ring-1 ring-gold-300')}>
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
         <div className="flex items-center gap-2.5">
           <span className={cx('flex h-9 w-9 items-center justify-center rounded-xl', hafiz ? 'bg-gold-300 text-navy-900' : 'bg-gold-300/30 text-gold-600')}>
