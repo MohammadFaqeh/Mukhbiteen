@@ -53,7 +53,7 @@ export default function AdminLayout() {
       />
       <main className={cx('px-4 pb-8 pt-4 transition-[margin] duration-200 sm:px-6 lg:px-8 lg:pt-6', collapsed ? 'lg:mr-[92px]' : 'lg:mr-[260px]')}>
         <div className="mx-auto max-w-[1400px]">
-          <header className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-navy-100/70 bg-white/80 px-5 py-3 shadow-soft backdrop-blur">
+          <header className="relative z-50 mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-navy-100/70 bg-white/80 px-5 py-3 shadow-soft backdrop-blur">
             <div className="flex items-center gap-4">
               <LogoPair size="sm" className="hidden sm:flex" />
               <div>
