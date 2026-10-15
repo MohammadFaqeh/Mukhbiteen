@@ -148,8 +148,16 @@ export function requirementFromRow(r: any): NextRequirement {
     revisionPages: r.revision_pages ?? undefined,
     extraTask: r.extra_task ?? undefined,
     notes: r.notes ?? undefined,
-    updatedAt: r.updated_at,
+    updatedAt: toLocalDate(r.updated_at),
   };
+}
+
+/** updated_at عمود timestamptz يرجع "2026-10-15T05:00:00+00:00" — نحوله لتاريخ محلي YYYY-MM-DD لأن العرض يتوقع تاريخًا فقط */
+function toLocalDate(v: unknown): string {
+  if (typeof v !== 'string' || !v.includes('T')) return (v as string) ?? '';
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return v.slice(0, 10);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 export function requirementToRow(r: NextRequirement) {

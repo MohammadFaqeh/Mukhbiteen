@@ -137,7 +137,7 @@ export default function Sidebar({ items, onLogout, footer, tone, subtitle, colla
       </div>
 
       {open && (
-        <div className="fixed inset-0 z-50 lg:hidden">
+        <div className="fixed inset-0 z-[60] lg:hidden">
           <button className="absolute inset-0 animate-fade-in bg-navy-950/40" onClick={() => setOpen(false)} aria-label="إغلاق القائمة" />
           <aside className="absolute inset-y-0 right-0 w-[82%] max-w-[300px] animate-slide-in bg-paper p-5 shadow-lift">
             <button onClick={() => setOpen(false)} className="absolute left-4 top-4 rounded-full p-2 text-navy-400 hover:bg-navy-50" aria-label="إغلاق">

@@ -29,7 +29,7 @@ function AssignmentCard({ a, onEdit, defaultOpen }: { a: Assignment; onEdit: () 
   return (
     <section id={`assignment-${a.id}`} className="card overflow-hidden">
       <div className="flex flex-wrap items-start gap-3 p-4">
-        <button onClick={() => setOpen((o) => !o)} className="flex min-w-0 flex-1 items-start gap-3 text-right" aria-expanded={open}>
+        <button onClick={() => setOpen((o) => !o)} className="flex min-w-0 flex-1 basis-[16rem] items-start gap-3 text-right" aria-expanded={open}>
           <ChevronDown className={cx('mt-1 h-4 w-4 shrink-0 text-navy-400 transition', open && 'rotate-180')} />
           <span className="min-w-0">
             <span className="block text-[15px] font-extrabold text-navy-900">{a.title}</span>
@@ -41,24 +41,28 @@ function AssignmentCard({ a, onEdit, defaultOpen }: { a: Assignment; onEdit: () 
             {a.description && <span className="mt-1 block text-[13px] text-navy-600">{a.description}</span>}
           </span>
         </button>
-        <div className="flex flex-wrap items-center gap-1.5">
+        {/* basis-[16rem] على العنوان: على التلفون الشارات تنزل لسطر تحته بدل ما تعصر العنوان كلمة بكل سطر */}
+        <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto">
           <Badge tone="green">مكتمل {done}/{rows.length}</Badge>
           {late > 0 && <Badge tone="burgundy">متأخر {late}</Badge>}
           <Badge tone={a.visibleToParents ? 'navy' : 'gray'}>
             {a.visibleToParents ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
             {a.visibleToParents ? 'ظاهر للأهل' : 'للإدارة فقط'}
           </Badge>
-          <button className="rounded-lg p-2 text-navy-400 hover:bg-navy-50 hover:text-navy-800" onClick={onEdit} aria-label="تعديل" title="تعديل">
-            <PencilLine className="h-4 w-4" />
-          </button>
-          <button
-            className="rounded-lg p-2 text-navy-300 hover:bg-burgundy-50 hover:text-burgundy-600"
-            aria-label="حذف"
-            title="حذف"
-            onClick={() => confirmDelete(`حذف المطلوب "${a.title}" وكل ما سُجّل عليه من إنجاز؟`, () => deleteAssignment(a.id), 'تم حذف المطلوب')}
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
+          {/* زرّا التعديل والحذف مع بعض دائمًا (ما ينفصل زر الحذف لحاله على سطر) */}
+          <div className="ms-auto flex shrink-0 items-center">
+            <button className="rounded-lg p-2 text-navy-400 hover:bg-navy-50 hover:text-navy-800" onClick={onEdit} aria-label="تعديل" title="تعديل">
+              <PencilLine className="h-4 w-4" />
+            </button>
+            <button
+              className="rounded-lg p-2 text-navy-300 hover:bg-burgundy-50 hover:text-burgundy-600"
+              aria-label="حذف"
+              title="حذف"
+              onClick={() => confirmDelete(`حذف المطلوب "${a.title}" وكل ما سُجّل عليه من إنجاز؟`, () => deleteAssignment(a.id), 'تم حذف المطلوب')}
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
       {open && (

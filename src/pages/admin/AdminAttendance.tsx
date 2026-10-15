@@ -253,7 +253,7 @@ export default function AdminAttendance() {
             <input type="date" className="input w-44" value={date} onChange={(e) => changeDate(e.target.value)} aria-label="تاريخ الدوام" />
             {savedDates.length > 0 && (
               <Select
-                className="w-48"
+                className="w-56"
                 ariaLabel="الأيام المحفوظة"
                 value={savedDates.includes(date) ? date : ''}
                 onChange={changeDate}
@@ -363,7 +363,7 @@ export default function AdminAttendance() {
                       <NumberInput small value={attended ? r.score : undefined} onChange={(v) => patch(r.studentId, { score: v })} placeholder="تلقائي" ariaLabel="علامة اليوم" />
                     </div>
                   </Cell>
-                  <Cell label="الحفظ (علامة / مطلوب / منجز)" className={cx(!attended && 'pointer-events-none opacity-40')}>
+                  <Cell label="الحفظ (علامة / مطلوب / منجز)" className={cx('col-span-2 2xl:col-span-1', !attended && 'pointer-events-none opacity-40')}>
                     <div className="flex items-center gap-1">
                       <button type="button" onClick={() => patch(r.studentId, { hasMem: !r.hasMem })} className={cx('h-7 w-7 shrink-0 rounded-lg border text-[11px]', r.hasMem ? 'border-navy-700 bg-navy-700 text-white' : 'border-navy-100 text-navy-300')} aria-label="يوجد حفظ">
                         <Check className="mx-auto h-3.5 w-3.5" />
@@ -374,7 +374,7 @@ export default function AdminAttendance() {
                       {r.hasMem && <span className="w-9 shrink-0 text-[11px] font-bold text-navy-500">{pct(entryCompletion({ requiredPages: r.memRequiredPages, completedPages: r.memCompletedPages, approved: r.memApproved }), 0)}</span>}
                     </div>
                   </Cell>
-                  <Cell label="المراجعة (علامة / مطلوب / منجز)" className={cx(!attended && 'pointer-events-none opacity-40')}>
+                  <Cell label="المراجعة (علامة / مطلوب / منجز)" className={cx('col-span-2 2xl:col-span-1', !attended && 'pointer-events-none opacity-40')}>
                     <div className="flex items-center gap-1">
                       <button type="button" onClick={() => patch(r.studentId, { hasRev: !r.hasRev })} className={cx('h-7 w-7 shrink-0 rounded-lg border', r.hasRev ? 'border-burgundy-600 bg-burgundy-600 text-white' : 'border-navy-100 text-navy-300')} aria-label="يوجد مراجعة">
                         <Check className="mx-auto h-3.5 w-3.5" />

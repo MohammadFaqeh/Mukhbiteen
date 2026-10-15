@@ -31,7 +31,7 @@ export default function RecitationStatusCard({ studentId, sessions, assignments,
         <span className={cx('flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white', st.behind ? 'bg-burgundy-600' : 'bg-emerald-600')}>
           {st.behind ? <AlertTriangle className="h-5 w-5" /> : <ShieldCheck className="h-5 w-5" />}
         </span>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 basis-[12rem]">
           <p className={cx('text-[16px] font-extrabold', st.behind ? 'text-burgundy-700' : 'text-emerald-800')}>{st.behind ? 'يوجد تقصير في التسميع المطلوب' : 'ملتزم بالتسميع المطلوب'}</p>
           <p className="text-[12px] text-navy-500">آخر تسميع: {st.lastRecitedAt ? formatDate(st.lastRecitedAt) : 'لا يوجد بعد'}</p>
         </div>

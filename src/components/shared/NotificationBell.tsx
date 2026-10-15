@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bell, CheckCheck, SlidersHorizontal } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
@@ -18,6 +18,8 @@ export default function NotificationBell({ className }: { className?: string }) 
   const [open, setOpen] = useState(false);
   const [center, setCenter] = useState(false);
   const box = useRef<HTMLDivElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  const [shift, setShift] = useState(0);
   const navigate = useNavigate();
   const admin = user?.role === 'admin';
 
@@ -33,6 +35,17 @@ export default function NotificationBell({ className }: { className?: string }) 
       document.removeEventListener('touchstart', onDown);
       document.removeEventListener('keydown', onKey);
     };
+  }, [open]);
+
+  // القائمة تنفتح من حافة الجرس: لو الجرس على يمين الشاشة (هيدر الإدارة على التلفون) كانت تطلع برا الشاشة،
+  // فنقيس مكانها بعد الفتح ونزيحها لتبقى داخل الشاشة بهامش 16px
+  useLayoutEffect(() => {
+    if (!open || !panel.current || !box.current) return setShift(0);
+    const gutter = 16;
+    const anchor = box.current.getBoundingClientRect().left;
+    const width = panel.current.offsetWidth;
+    const left = Math.min(Math.max(anchor, gutter), window.innerWidth - gutter - width);
+    setShift(left - anchor);
   }, [open]);
 
   return (
@@ -52,7 +65,7 @@ export default function NotificationBell({ className }: { className?: string }) 
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full z-50 mt-2 w-[min(360px,calc(100vw-32px))] animate-pop-in overflow-hidden rounded-2xl border border-navy-100 bg-white shadow-lift">
+        <div ref={panel} style={{ left: shift }} className="absolute top-full z-50 mt-2 w-[min(360px,calc(100vw-32px))] animate-pop-in overflow-hidden rounded-2xl border border-navy-100 bg-white shadow-lift">
           <header className="flex items-center justify-between gap-2 border-b border-navy-50 px-4 py-3">
             <p className="text-[14px] font-extrabold text-navy-900">الإشعارات</p>
             {unread > 0 && (
