@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Award, BookMarked, Crown, Loader2, Sparkles } from 'lucide-react';
 import { useData } from '@/context/DataContext';
 import { useToast } from '@/context/ToastContext';
@@ -120,10 +120,6 @@ export default function JuzMap({ student, editable }: { student: Student; editab
   const done = new Set(juz);
   const { percent, hafiz } = juzProgress(student);
   const { prior, inProject } = juzSummary(student);
-  const [totalInput, setTotalInput] = useState(String(done.size));
-  // الخانة تتبع العدد الحالي بعد أي ضغط على جزء
-  useEffect(() => setTotalInput(String(done.size)), [done.size]);
-
   const persist = async (next: number[], dates: Record<string, string>, sources: Record<string, JuzSource>) => {
     setBusy(true);
     try {
@@ -148,31 +144,6 @@ export default function JuzMap({ student, editable }: { student: Student; editab
     await persist([...juz, n], { ...otherDates, [key]: TODAY }, { ...otherSources, [key]: 'manual' });
   };
 
-  /**
-   * عدد الأجزاء المحفوظة الكلي: الزيادة تُضاف من الجزء 30 نزولًا (ترتيب الحفظ المعتاد) متجاوزةً المحدَّد أصلًا،
-   * والنقص يُلغي الأبعد عن الجزء 30 أولًا (والتلقائية بنجمة آخرًا لأنها تعود مع سجل التسميع). تُعدَّل بعدها بالضغط.
-   */
-  const applyTotal = async () => {
-    const want = Math.max(0, Math.min(JUZ_COUNT, Math.floor(Number(totalInput) || 0)));
-    let next = [...done];
-    if (want > next.length) {
-      for (let n = JUZ_COUNT; n >= 1 && next.length < want; n--) if (!done.has(n)) next.push(n);
-    } else if (want < next.length) {
-      const removeOrder = [...next].sort((a, b) => Number(juzSource(student, a) === 'auto') - Number(juzSource(student, b) === 'auto') || a - b);
-      const drop = new Set(removeOrder.slice(0, next.length - want));
-      next = next.filter((n) => !drop.has(n));
-    }
-    const keep = new Set(next);
-    const sources: Record<string, JuzSource> = Object.fromEntries(Object.entries(student.memorizedJuzSources ?? {}).filter(([k]) => keep.has(Number(k))));
-    const dates: Record<string, string> = Object.fromEntries(Object.entries(student.memorizedJuzDates ?? {}).filter(([k]) => keep.has(Number(k))));
-    next.filter((n) => !done.has(n)).forEach((n) => {
-      sources[String(n)] = 'manual';
-      dates[String(n)] = TODAY;
-    });
-    await persist(next, dates, sources);
-    toast(`عدد الأجزاء المحفوظة: ${next.length}`);
-  };
-
   const certificate = async (n: number) => {
     setCertBusy(n);
     try {
@@ -194,7 +165,7 @@ export default function JuzMap({ student, editable }: { student: Student; editab
           </span>
           <div>
             <h3 className="section-title">حفظ القرآن الكريم</h3>
-            <p className="text-[12px] text-navy-400">{editable ? 'اضغط على الجزء لتحديده أو إلغائه' : done.size ? 'اضغط على أي جزء محفوظ لتحميل شهادة إتمامه' : 'الأجزاء التي أتمّ الطالب حفظها'}</p>
+            <p className="text-[12px] text-navy-400">{editable ? 'اضغط على الجزء لتظليله أو إلغائه — العدد يُحسب تلقائيًا من الأجزاء المظلَّلة' : done.size ? 'اضغط على أي جزء محفوظ لتحميل شهادة إتمامه' : 'الأجزاء التي أتمّ الطالب حفظها'}</p>
             {prior > 0 && (
               <p className="text-[12px] text-navy-500">
                 محفوظة سابقًا: <b>{prior}</b> · أُتمّت في المشروع: <b>{inProject}</b>
@@ -219,22 +190,10 @@ export default function JuzMap({ student, editable }: { student: Student; editab
         <b className="w-12 text-left text-[13px] text-navy-800">{percent}%</b>
       </div>
 
-      {editable && (
-        <div className="mb-3 flex flex-wrap items-end gap-3 rounded-2xl bg-navy-50/60 p-3">
-          <div className="flex items-end gap-1.5">
-            <label>
-              <span className="field-label">كم جزءًا يحفظ الطالب الآن؟</span>
-              <input type="number" min={0} max={JUZ_COUNT} className="input input-sm w-20 text-center" value={totalInput} onChange={(e) => setTotalInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && applyTotal()} />
-            </label>
-            <button type="button" className="btn-soft px-3 py-1.5 text-[12px]" disabled={busy || Number(totalInput) === done.size} onClick={applyTotal} title="الزيادة تُضاف من الجزء 30 نزولًا، ويمكن تعديل أي جزء بالضغط عليه">
-              تطبيق
-            </button>
-          </div>
-          <p className="basis-full text-[11px] text-navy-400">اكتب العدد ثم «تطبيق» — تُحدَّد الأجزاء من الجزء 30 نزولًا. لتحديد جزء معيّن أو إلغائه اضغط عليه مباشرة.</p>
-          <p className="basis-full text-[11px] text-navy-400">
-            <Sparkles className="inline h-3 w-3" /> الجزء المعلَّم بنجمة أضافه النظام تلقائيًا: كل صفحاته سُمّعت حفظًا بتسميع معتمد (من أرقام الصفحات في خانة "ما تم تسميعه" أو مطلوبات الحفظ بالصفحات).
-          </p>
-        </div>
+      {editable && juz.some((n) => juzSource(student, n) === 'auto') && (
+        <p className="mb-3 rounded-2xl bg-navy-50/60 p-3 text-[11px] text-navy-400">
+          <Sparkles className="inline h-3 w-3" /> الجزء المعلَّم بنجمة أضافه النظام تلقائيًا: كل صفحاته سُمّعت حفظًا بتسميع معتمد (من أرقام الصفحات في خانة "ما تم تسميعه" أو مطلوبات الحفظ بالصفحات).
+        </p>
       )}
 
       <div className="grid grid-cols-6 gap-1.5 sm:grid-cols-10">
