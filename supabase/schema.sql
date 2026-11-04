@@ -531,6 +531,21 @@ $$;
 
 -- تنفيذ قواعد الإشعارات التلقائية — يشغّلها pg_cron كل 10 دقائق (حتى لو الموقع مغلق)،
 -- وتشغّلها الإدارة من الموقع بعد الحفظ لإرسال فوري. يرجع عدد الإشعارات المنشأة.
+-- هل أعلن المشرف "لا يوجد دوام" في هذا التاريخ؟ (لا يفشل إن لم يوجد جدول الإعدادات بعد)
+create or replace function public.no_session_on(d date)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  return exists (select 1 from public.app_settings where key = 'session_notice' and value ->> 'kind' = 'none' and (value ->> 'date')::date = d);
+exception when undefined_table then
+  return false;
+end;
+$$;
+
 create or replace function public.run_notification_rules()
 returns int
 language plpgsql
@@ -552,7 +567,9 @@ begin
   for r in select * from public.notification_rules where enabled loop
     if r.type = 'session_reminder' then
       -- الغد يوم دوام، وحان وقت الإرسال اليوم
-      if extract(dow from today + 1)::int = any (r.weekdays) and lnow::time >= coalesce(r.send_time, '18:00') then
+      -- (إلا إذا أعلن المشرف أنه لا يوجد دوام غدًا)
+      if extract(dow from today + 1)::int = any (r.weekdays) and lnow::time >= coalesce(r.send_time, '18:00')
+         and not public.no_session_on(today + 1) then
         for x in select s.id, s.name from public.students s
                  where s.active and (cardinality(r.audience) = 0 or s.group_name = any (r.audience)) loop
           if public.notify_student_parents(x.id,
@@ -732,6 +749,23 @@ create policy "user marks own notifications read" on public.notification_recipie
 
 drop policy if exists "admin full access notification_rules" on public.notification_rules;
 create policy "admin full access notification_rules" on public.notification_rules for all using (public.is_admin()) with check (public.is_admin());
+
+-- ------------------------------------------------------------------
+--  تنبيه الدوام القادم (عام لكل الطلاب): "دوام تجويد فقط" أو "لا يوجد دوام" بتاريخ محدد.
+--  يظهر لكل الأهل بدل تذكرة المطلوب حتى ينتهي تاريخه، ومطلوبات الطلاب تبقى محفوظة كما هي.
+--  يُخزَّن بمفتاح 'session_notice' وقيمته: {"kind": "tajweed"|"none", "date": "YYYY-MM-DD", "note": "..."}
+-- ------------------------------------------------------------------
+create table if not exists public.app_settings (
+  key text primary key,
+  value jsonb,
+  updated_at timestamptz not null default now()
+);
+alter table public.app_settings enable row level security;
+grant select, insert, update, delete on public.app_settings to authenticated;
+drop policy if exists "admin full access app_settings" on public.app_settings;
+create policy "admin full access app_settings" on public.app_settings for all using (public.is_admin()) with check (public.is_admin());
+drop policy if exists "signed in reads app_settings" on public.app_settings;
+create policy "signed in reads app_settings" on public.app_settings for select using (auth.uid() is not null);
 
 -- ------------------------------------------------------------------
 --  الجدولة على الخادم (pg_cron): تشغيل القواعد كل 10 دقائق حتى لو لا أحد يفتح الموقع.

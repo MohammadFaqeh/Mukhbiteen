@@ -143,6 +143,16 @@ export interface NextRequirement {
   updatedAt: string;
 }
 
+/**
+ * تنبيه عام للدوام القادم يظهر لكل الأهل بدل تذكرة المطلوب حتى انتهاء تاريخه:
+ * tajweed = دوام تجويد فقط (لا حفظ ولا مراجعة)، none = لا يوجد دوام.
+ */
+export interface SessionNotice {
+  kind: 'tajweed' | 'none';
+  date: string; // YYYY-MM-DD
+  note?: string;
+}
+
 /** صورة ضمن منشور الأنشطة — العنوان اختياري لكل صورة */
 export interface ActivityImage {
   url: string;

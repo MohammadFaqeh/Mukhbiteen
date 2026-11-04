@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { HandHeart } from 'lucide-react';
 import { useParentStudent } from '@/hooks/useParentStudent';
+import { useData } from '@/context/DataContext';
 import StudentHero from '@/components/parent/StudentHero';
 import NextSessionTicket from '@/components/parent/NextSessionTicket';
 import RecitationStatusCard from '@/components/parent/RecitationStatusCard';
@@ -10,6 +11,7 @@ import { weekDates, weekStartOf } from '@/utils/worship';
 
 export default function ParentHome() {
   const { student, sessions, worship, stats, requirement, assignments } = useParentStudent();
+  const { activeSessionNotice } = useData();
   if (!student || !stats) return <p className="p-10 text-center text-navy-400">لم يتم العثور على بيانات الطالب.</p>;
   const weekDays = weekDates(weekStartOf(TODAY))
     .map((d) => worship.find((w) => w.date === d))
@@ -18,7 +20,7 @@ export default function ParentHome() {
   return (
     <div className="space-y-4 sm:space-y-5">
       <StudentHero student={student} stats={stats} />
-      <NextSessionTicket req={requirement} />
+      <NextSessionTicket req={requirement} notice={activeSessionNotice} />
       <RecitationStatusCard studentId={student.id} sessions={sessions} assignments={assignments} />
 
       <div className="space-y-2">

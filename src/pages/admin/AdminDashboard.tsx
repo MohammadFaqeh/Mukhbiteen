@@ -7,6 +7,7 @@ import ScoreChart from '@/components/ui/ScoreChart';
 import Avatar from '@/components/ui/Avatar';
 import { AttendanceBadge } from '@/components/ui/Badge';
 import StudentFormModal from '@/components/admin/StudentFormModal';
+import SessionNoticeControl from '@/components/admin/SessionNoticeControl';
 import { TODAY } from '@/utils/today';
 import { ProgressBar } from '@/components/ui/Progress';
 import { attendanceRate, groupMetrics } from '@/utils/stats';
@@ -39,6 +40,8 @@ export default function AdminDashboard() {
         <StatCard icon={CalendarCheck} label="نسبة الحضور" value={pct(data.attendance)} progress={data.attendance} tone="green" />
         <StatCard icon={UserCheck} label="حاضرون في آخر دوام" value={`${data.present}/${data.today.length || students.length}`} hint={formatDate(data.latestDate)} tone="gold" />
       </div>
+
+      <SessionNoticeControl />
 
       {/* مؤشرات الإنجاز: كل مقياس باسمه وطريقة حسابه بدل رقم عام مبهم */}
       <section className="card p-4 sm:p-5">

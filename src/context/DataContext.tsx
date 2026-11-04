@@ -7,6 +7,7 @@ import type {
   DailyWorship,
   HonorBoard,
   NextRequirement,
+  SessionNotice,
   SessionRecord,
   Student,
   TajweedChapter,
@@ -82,6 +83,12 @@ interface DataValue extends AppData {
   deleteAssignmentProgress: (p: AssignmentProgress) => Promise<void>;
   /** تشغيل قواعد الإشعارات التلقائية فورًا (بدل انتظار الجدولة) — لا يرمي خطأ */
   runNotificationRules: () => Promise<void>;
+  /** تنبيه الدوام القادم العام كما هو مخزّن (قد يكون منتهيًا — استخدم activeSessionNotice للعرض) */
+  sessionNotice: SessionNotice | null;
+  /** التنبيه إن كان تاريخه اليوم أو بعده، وإلا null */
+  activeSessionNotice: SessionNotice | null;
+  /** null = إلغاء التنبيه */
+  saveSessionNotice: (n: SessionNotice | null) => Promise<void>;
 }
 
 const DataContext = createContext<DataValue | null>(null);
@@ -125,6 +132,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const loadedOnce = useRef(false);
   const [assignmentsReady, setAssignmentsReady] = useState(false);
+  const [sessionNotice, setSessionNotice] = useState<SessionNotice | null>(null);
   // أحدث نسخة من البيانات للدوال غير المتزامنة (إعادة حساب الأجزاء بعد الحفظ)
   const dataRef = useRef<AppData>(empty);
   dataRef.current = data;
@@ -144,6 +152,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
       supabase.from('assignments').select(ASSIGNMENT_SELECT).order('created_at', { ascending: false }),
       supabase.from('assignment_progress').select('*'),
     ]);
+    // جدول الإعدادات جديد: لو قاعدة البيانات ما تحدّثت بعد، الموقع يشتغل عادي بدون تنبيه الدوام
+    const notice = await supabase.from('app_settings').select('value').eq('key', 'session_notice').maybeSingle();
+    if (notice.error) console.warn('تعذّر تحميل تنبيه الدوام القادم — شغّل supabase/schema.sql', notice.error.message);
+    const nv = notice.data?.value as SessionNotice | null | undefined;
+    setSessionNotice(nv && (nv.kind === 'tajweed' || nv.kind === 'none') && typeof nv.date === 'string' ? nv : null);
     const firstError = [students, sessions, dailyWorship, nextRequirements, activities, honorBoards].find((r) => r.error)?.error;
     if (tajweedMaterials.error) console.warn('جدول tajweed_materials غير موجود — شغّل supabase/schema.sql', tajweedMaterials.error.message);
     // جداول المطلوبات جديدة: لو قاعدة البيانات ما تحدّثت بعد، الموقع يشتغل عادي بدونها
@@ -192,6 +205,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     } else {
       loadedOnce.current = false;
       setData(empty);
+      setSessionNotice(null);
       setError(null);
       setLoading(false);
     }
@@ -508,6 +522,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
     [afterProgressChange],
   );
 
+  const saveSessionNotice = useCallback(async (n: SessionNotice | null) => {
+    const { error: err } = await supabase.from('app_settings').upsert({ key: 'session_notice', value: n, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+    if (err) throw schemaError(err.message, /app_settings/);
+    setSessionNotice(n);
+  }, []);
+  const activeSessionNotice = sessionNotice && sessionNotice.date >= TODAY ? sessionNotice : null;
+
   const value = useMemo<DataValue>(
     () => ({
       ...data,
@@ -540,6 +561,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       addAssignmentProgress,
       deleteAssignmentProgress,
       runNotificationRules,
+      sessionNotice,
+      activeSessionNotice,
+      saveSessionNotice,
     }),
     [
       data,
@@ -572,6 +596,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       addAssignmentProgress,
       deleteAssignmentProgress,
       runNotificationRules,
+      sessionNotice,
+      activeSessionNotice,
+      saveSessionNotice,
     ],
   );
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

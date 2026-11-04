@@ -1,5 +1,6 @@
 import { BookOpen, RotateCcw } from 'lucide-react';
 import { useParentStudent } from '@/hooks/useParentStudent';
+import { useData } from '@/context/DataContext';
 import NextSessionTicket from '@/components/parent/NextSessionTicket';
 import RecitationStatusCard from '@/components/parent/RecitationStatusCard';
 import PageHeader from '@/components/shared/PageHeader';
@@ -8,11 +9,12 @@ import { hasMeasure, isApproved } from '@/utils/quran';
 
 export default function ParentNext() {
   const { student, sessions, requirement, assignments } = useParentStudent();
+  const { activeSessionNotice } = useData();
   const last = sessions.find((s) => s.memorization);
   return (
     <div>
       <PageHeader title="المطلوب عند الكل" subtitle={`الواجبات والمطلوبات المحددة من المشرف للطالب ${student?.name ?? ''}`} />
-      <NextSessionTicket req={requirement} />
+      <NextSessionTicket req={requirement} notice={activeSessionNotice} />
       {student && (
         <div className="mt-5">
           <RecitationStatusCard studentId={student.id} sessions={sessions} assignments={assignments} full />
