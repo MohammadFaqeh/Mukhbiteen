@@ -196,19 +196,20 @@ export default function JuzMap({ student, editable }: { student: Student; editab
         </p>
       )}
 
-      <div className="grid grid-cols-6 gap-1.5 sm:grid-cols-10">
+      {/* 10 أعمدة دائمًا (3 صفوف): مربعات صغيرة على الجوال، وعرض محدود على الشاشات الكبيرة حتى لا تتضخم */}
+      <div className="grid max-w-[30rem] grid-cols-10 gap-1 sm:gap-1.5">
         {Array.from({ length: JUZ_COUNT }, (_, i) => i + 1).map((n) => {
           const on = done.has(n);
           const src = on ? juzSource(student, n) : null;
           const cls = cx(
-            'relative flex aspect-square items-center justify-center rounded-lg text-[12px] font-bold transition',
+            'relative flex h-8 items-center justify-center rounded-md text-[11px] font-bold transition sm:aspect-square sm:h-auto sm:rounded-lg sm:text-[12px]',
             on ? (hafiz ? 'bg-gold-400 text-navy-900' : src === 'prior' ? 'bg-gold-300 text-navy-900 shadow-soft' : 'bg-navy-800 text-white shadow-soft') : 'bg-navy-50/70 text-navy-300',
             editable && (on ? 'hover:opacity-85' : 'hover:bg-navy-100 hover:text-navy-500'),
           );
           return editable ? (
             <button key={n} type="button" disabled={busy} onClick={() => toggle(n)} className={cls} aria-pressed={on} aria-label={`الجزء ${n}`} title={src ? sourceTitle[src] : undefined}>
               {n}
-              {src === 'auto' && <Sparkles className="absolute right-0.5 top-0.5 h-2.5 w-2.5 opacity-70" />}
+              {src === 'auto' && <Sparkles className="absolute right-0.5 top-0.5 hidden h-2.5 w-2.5 opacity-70 sm:block" />}
             </button>
           ) : on ? (
             <button
@@ -221,7 +222,7 @@ export default function JuzMap({ student, editable }: { student: Student; editab
               title={`${src ? sourceTitle[src] : ''} — تحميل شهادة ${juzTitle(n)}`}
             >
               {certBusy === n ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : n}
-              <Award className="absolute left-0.5 top-0.5 h-2.5 w-2.5 opacity-60" />
+              <Award className="absolute left-0.5 top-0.5 hidden h-2.5 w-2.5 opacity-60 sm:block" />
             </button>
           ) : (
             <span key={n} className={cls} aria-label={`الجزء ${n}`}>
