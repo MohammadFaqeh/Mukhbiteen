@@ -16,7 +16,8 @@ import { downloadStudentsFile } from '@/utils/studentsExcel';
 import type { CommitmentLevel, Student } from '@/types';
 import { studentStats } from '@/utils/stats';
 import { HafizBadge, juzCountLabel } from '@/components/shared/JuzMap';
-import { cx, pct } from '@/utils/format';
+import { ageLabel, ageYears, cx, pct } from '@/utils/format';
+import { TODAY } from '@/utils/today';
 
 type Sort = 'avg' | 'name' | 'attendance';
 
@@ -125,13 +126,13 @@ export default function AdminStudents() {
           <section className="card overflow-hidden">
             <div className="scrollbar-thin overflow-x-auto">
               <table className="w-full min-w-[860px] text-[13px]">
-                <thead className="bg-navy-50/60 text-right text-[12px] text-navy-500">
+                <thead className="whitespace-nowrap bg-navy-50/60 text-right text-[12px] text-navy-500">
                   <tr>
                     <th className="px-5 py-3 font-medium">الطالب</th>
+                    <th className="px-3 py-3 font-medium">العمر</th>
                     <th className="px-3 py-3 font-medium">ولي الأمر</th>
                     <th className="px-3 py-3 font-medium">المحفوظ</th>
-                    <th className="w-44 px-3 py-3 font-medium">المعدل</th>
-                    <th className="px-3 py-3 font-medium">معدل الشهر</th>
+                    <th className="px-3 py-3 font-medium">المعدل</th>
                     <th className="px-3 py-3 font-medium">الحضور</th>
                     <th className="px-3 py-3 font-medium">آخر علامة</th>
                     <th className="px-3 py-3 font-medium">الالتزام</th>
@@ -142,7 +143,7 @@ export default function AdminStudents() {
                   {rows.map(({ s, st }) => (
                     <tr key={s.id} className="border-t border-navy-50 hover:bg-navy-50/30">
                       <td className="px-5 py-3">
-                        <div className="flex items-center gap-3">
+                        <div className="flex min-w-[11rem] items-center gap-3">
                           <Avatar name={s.name} src={s.photo} size={38} />
                           <div>
                             <p className="font-bold text-navy-900">{s.name}</p>
@@ -152,17 +153,20 @@ export default function AdminStudents() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-3 py-3 text-navy-600">{s.guardianName}</td>
+                      <td className="whitespace-nowrap px-3 py-3 text-navy-700">{(() => {
+                        const age = ageYears(s.birthDate, TODAY);
+                        return age === null ? <span className="text-navy-300">—</span> : ageLabel(age);
+                      })()}</td>
+                      <td className="whitespace-nowrap px-3 py-3 text-navy-600">{s.guardianName}</td>
                       <td className="whitespace-nowrap px-3 py-3 text-navy-700">
                         {s.memorizedJuz?.length === 30 ? <HafizBadge /> : s.memorizedJuz?.length ? juzCountLabel(s.memorizedJuz.length) : '—'}
                       </td>
                       <td className="px-3 py-3">
                         <div className="flex items-center gap-2">
-                          <ProgressBar value={st.cumulative} thin />
-                          <b className="w-12 text-navy-900">{pct(st.cumulative)}</b>
+                          <ProgressBar value={st.cumulative} thin className="min-w-[4rem]" />
+                          <b className="w-12 shrink-0 text-navy-900">{pct(st.cumulative)}</b>
                         </div>
                       </td>
-                      <td className="px-3 py-3 text-navy-700">{pct(st.monthAverage)}</td>
                       <td className="px-3 py-3 text-navy-700">{pct(st.attendance)}</td>
                       <td className="px-3 py-3 font-bold text-navy-900">{st.lastScore ?? '—'}</td>
                       <td className="px-3 py-3">
@@ -170,11 +174,11 @@ export default function AdminStudents() {
                       </td>
                       <td className="px-5 py-3">
                         <div className="flex justify-end gap-1.5">
-                          <Link to={`/admin/students/${s.id}`} className="btn-soft px-3 py-1.5 text-[12px]">
-                            <Eye className="h-3.5 w-3.5" /> عرض
+                          <Link to={`/admin/students/${s.id}`} className="btn-soft px-2.5 py-1.5 text-[12px] 2xl:px-3" title="عرض" aria-label={`عرض ${s.name}`}>
+                            <Eye className="h-3.5 w-3.5" /> <span className="hidden 2xl:inline">عرض</span>
                           </Link>
-                          <button onClick={() => setModal({ open: true, student: s })} className="btn-ghost px-3 py-1.5 text-[12px]">
-                            <PencilLine className="h-3.5 w-3.5" /> تعديل
+                          <button onClick={() => setModal({ open: true, student: s })} className="btn-ghost px-2.5 py-1.5 text-[12px] 2xl:px-3" title="تعديل" aria-label={`تعديل ${s.name}`}>
+                            <PencilLine className="h-3.5 w-3.5" /> <span className="hidden 2xl:inline">تعديل</span>
                           </button>
                           <button
                             onClick={() => confirmDelete(`حذف الطالب "${s.name}" نهائيًا مع كل سجلاته (الدوام، العبادات، المطلوب القادم)؟`, () => deleteStudent(s.id), 'تم حذف الطالب وكل سجلاته')}

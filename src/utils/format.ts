@@ -86,3 +86,20 @@ export function initials(name: string) {
 export function cx(...classes: (string | false | null | undefined)[]) {
   return classes.filter(Boolean).join(' ');
 }
+
+/** العمر بالسنوات الكاملة من تاريخ الميلاد (YYYY-MM-DD) حتى تاريخ مرجعي، أو null إن لم يُدخل */
+export function ageYears(birthDate: string | undefined, today: string): number | null {
+  if (!birthDate || !/^\d{4}-\d{2}-\d{2}/.test(birthDate)) return null;
+  const [by, bm, bd] = birthDate.slice(0, 10).split('-').map(Number);
+  const [ty, tm, td] = today.slice(0, 10).split('-').map(Number);
+  const age = ty - by - (tm < bm || (tm === bm && td < bd) ? 1 : 0);
+  return age >= 0 ? age : null;
+}
+
+/** "سنة" / "سنتان" / "7 سنوات" / "12 سنة" */
+export function ageLabel(n: number) {
+  if (n === 1) return 'سنة';
+  if (n === 2) return 'سنتان';
+  if (n >= 3 && n <= 10) return `${n} سنوات`;
+  return `${n} سنة`;
+}
